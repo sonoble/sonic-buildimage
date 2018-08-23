@@ -1,0 +1,3 @@
+{% if MGMT_INTERFACE %}
+configure ports eth0 lldp portidsubtype local {{ MGMT_INTERFACE.keys()[0][0] }}
+{% endif %}
