@@ -1,0 +1,31 @@
+FROM docker-config-engine
+
+ARG docker_container_name
+RUN [ -f /etc/rsyslog.conf ] && sed -ri "s/%syslogtag%/$docker_container_name#%syslogtag%/;" /etc/rsyslog.conf
+
+## Make apt-get non-interactive
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update
+
+COPY \
+{% for deb in docker_syncd_mlnx_debs.split(' ') -%}
+debs/{{ deb }}{{' '}}
+{%- endfor -%}
+debs/
+
+RUN apt-get install -y --no-install-recommends libxml2 iptables libbsd0 protobuf-c-compiler protobuf-compiler python-protobuf libprotobuf-c1 python-future python-ipaddr libnet1 pkg-config asciidoc xmlto
+
+RUN dpkg -i \
+{% for deb in docker_syncd_mlnx_debs.split(' ') -%}
+debs/{{ deb }}{{' '}}
+{%- endfor %}
+
+COPY ["start.sh", "/usr/bin/"]
+COPY ["supervisord.conf", "/etc/supervisor/conf.d/"]
+
+## Clean up
+RUN apt-get clean -y; apt-get autoclean -y; apt-get autoremove -y
+RUN rm -rf /debs
+
+ENTRYPOINT ["/usr/bin/supervisord"]
