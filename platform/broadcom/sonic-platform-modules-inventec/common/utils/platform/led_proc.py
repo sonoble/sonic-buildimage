@@ -20,7 +20,7 @@ import time
 import syslog
 import re
 from sonic_sfp.bcmshell import bcmshell
-
+from invCommon import InvPlatform
 
 # =====================================================================
 #  global variable init
@@ -36,11 +36,14 @@ STATUS_TX               = 1<<1
 # define data ram address
 PORT_DATA_OFFSET_ADDR   = 0xA0
 # define board type
-INV_MAGNOLIA            = "SONiC-Inventec-d6254qs"
-INV_REDWOOD             = "SONiC-Inventec-d7032-100"
-INV_CYPRESS             = "SONiC-Inventec-d7054"
-INV_MAPLE               = "SONiC-Inventec-d6556"
-INV_SEQUOIA             = ""
+INV_MAGNOLIA            = "x86_64-inventec_d6254qs-r0"
+INV_REDWOOD             = "x86_64-inventec_d7032q28b-r0"
+INV_CYPRESS             = "x86_64-inventec_d7054q28b-r0"
+INV_MAPLE               = "x86_64-inventec_d6356-r0"
+INV_MAPLE_J             = "x86_64-inventec_d6356j-r0"
+INV_MAPLE_EVT1          = "x86_64-inventec_d6556-r0"
+INV_SEQUOIA             = "x86_64-inventec_d7264q28b-r0"
+INV_SEQUOIA_NEW         = "x86_64-inventec_d7264-r0"
 BOARD_TPYE              = ""
 EAGLE_CORE              = []
 # define port data for bit streaming
@@ -120,8 +123,8 @@ def _board_init():
     global SYNC_S
     global SYNC_P
 
-    cmd = "uname -n"
-    platform = os.popen(cmd).read()
+    platfromObj = InvPlatform()
+    platform = platfromObj.get_platform()
 
     if platform.rstrip() == INV_MAGNOLIA:
         BOARD_TPYE      = "inventec_d6254qs"
@@ -151,10 +154,25 @@ def _board_init():
         BIT_SPEED0      = 1<<2  #0x04
         EAGLE_CORE      = [66, 100]
 
+    elif platform.rstrip() == INV_SEQUOIA_NEW:
+        BOARD_TPYE = "inventec_d7264"
+        exit(0)
+
     elif platform.rstrip() == INV_SEQUOIA:
         BOARD_TPYE = "inventec_d7264q28b"
+        #load prog and remap port order in led_proc_init.soc
+        #led process is controlled by data ram automatically
+        exit(0)
+
+    elif platform.rstrip() == INV_MAPLE_J:
+        BOARD_TPYE = "inventec_d6356j"
+        exit(0)
 
     elif platform.rstrip() == INV_MAPLE:
+        BOARD_TPYE = "inventec_d6356"
+        exit(0)
+
+    elif platform.rstrip() == INV_MAPLE_EVT1:
         BOARD_TPYE = "inventec_d6556"
         fp = open('/usr/share/sonic/device/x86_64-inventec_d6556-r0/led_proc_init.soc', "r")
         _remap_registers(fp)
