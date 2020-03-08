@@ -1,0 +1,4 @@
+# This series applies to sonic-platform-daemons GIT commit
+[CodeBase] a34ba131f618a8df6beec1f548aa08f9cedc48db
+[order]
+[sonic-platform-daemons]xcvrd-retrieve-DOM-info-using-platform-API.patch
