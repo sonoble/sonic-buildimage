@@ -1,0 +1,13 @@
+[Unit]
+Description=Inventec d6356j Platform modules
+After=local-fs.target
+Before=pmon.service
+
+[Service]
+Type=oneshot
+ExecStart=-/etc/init.d/platform-modules-d6356j start
+ExecStop=-/etc/init.d/platform-modules-d6356j stop
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
