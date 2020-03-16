@@ -18,10 +18,10 @@ class Psu(PsuBase):
         self.__num_of_fans = 1
         self.__index = index
         self.__psu_presence_attr    = "/sys/class/hwmon/hwmon2/device/psu{}".format(self.__index)
-        self.__psu_power_in_attr    = "/sys/class/hwmon/hwmon{}/power1_input".format(self.__index + 6)
-        self.__psu_power_out_attr   = "/sys/class/hwmon/hwmon{}/power2_input".format(self.__index + 6)
-        self.__psu_voltage_out_attr = "/sys/class/hwmon/hwmon{}/in2_input".format(self.__index + 6)
-        self.__psu_current_out_attr = "/sys/class/hwmon/hwmon{}/curr2_input".format(self.__index + 6)
+        self.__psu_power_in_attr    = "/sys/class/hwmon/hwmon{}/device/power1_input".format(self.__index + 6)
+        self.__psu_power_out_attr   = "/sys/class/hwmon/hwmon{}/device/power2_input".format(self.__index + 6)
+        self.__psu_voltage_out_attr = "/sys/class/hwmon/hwmon{}/device/in2_input".format(self.__index + 6)
+        self.__psu_current_out_attr = "/sys/class/hwmon/hwmon{}/device/curr2_input".format(self.__index + 6)
 
         # Overriding _fan_list class variable defined in PsuBase, to make it unique per Psu object
         self._fan_list = []

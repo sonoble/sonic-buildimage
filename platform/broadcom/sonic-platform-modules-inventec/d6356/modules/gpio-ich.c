@@ -109,7 +109,7 @@ static struct {
 	int outlvl_cache[3];	/* cached output values */
 } ichx_priv;
 
-static int modparam_gpiobase = -1;	/* dynamic */
+static int modparam_gpiobase = 0;	/* dynamic */
 module_param_named(gpiobase, modparam_gpiobase, int, 0444);
 MODULE_PARM_DESC(gpiobase, "The GPIO number base. -1 means dynamic, "
 			   "which is the default.");

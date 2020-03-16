@@ -1,0 +1,961 @@
+ ========================================
+ *  Switch Port Service Driver (SWPS)  * 
+ ========================================
+ 
+ Latest Version: 4.0
+ Update Date: 2016/11/28
+ 
+ 
+1. DESCRIPTION
+
+   SWPS driver is a Linux kernel driver which provide following main features
+   (1) Standard SFF interface to access transceiver/cables.
+   (2) Automatic handle mechansim for transceiver/cables.
+   (3) Automatic handle mechansim for port relate device.
+   (4) Automatic handle mechansim for I2C topology.
+     
+   
+2. FEATURES
+   
+   SWPS driver has two mode which is POLLING_MODE and NON_POLLING_MODE. There
+   are some features only for POLLING_MODE(default). The following section will 
+   markup them. 
+   If you want to change the running mode, please reference Note-3.2.
+   
+   2.1 Sysfs Interface (Each Mode)
+   => SWPS provide the Linux sysfs interface to access and control transceiver relate 
+      features. The access path in Linux environment as below: 
+      # /sys/class/swps/port[X]
+      
+   => Example for read data:
+      # cat /sys/class/swps/port0/id
+      
+   => Example for setup feature:
+      # echo 1 > /sys/class/swps/port0/lpmod
+   
+   2.2 SFP Port Directory Tree and Attributes:
+   => /sys/class/swps/port<NUM>
+                        |-- br
+                        |-- comp_eth
+                        |-- comp_eth_10
+                        |-- comp_extend
+                        |-- comp_rev
+                        |-- connector
+                        |-- hard_rs0
+                        |-- hard_rs1
+                        |-- id
+                        |-- if_lane
+                        |-- if_speed
+                        |-- if_type
+                        |-- info
+                        |-- len_sm
+                        |-- len_smf
+                        |-- len_om1
+                        |-- len_om2
+                        |-- len_om3
+                        |-- len_om4
+                        |-- present
+                        |-- rate_id
+                        |-- rx_power
+                        |-- rxlos
+                        |-- soft_rs0
+                        |-- soft_rs1
+                        |-- temperature
+                        |-- tx_bias
+                        |-- tx_disalbe
+                        |-- tx_fault
+                        |-- tx_power
+                        |-- vendor_name
+                        |-- vendor_pn
+                        |-- vendor_rev
+                        |-- vendor_sn
+                        |-- voltage
+                        `-- wavelength
+                        
+   =>  -----------------------------------------------------------------------
+       | Attribute   |     | Description                                     |
+       -----------------------------------------------------------------------
+       | br          | R   | Name: Bit Rate                                  |
+       |             |     | Addr: SFF-8472 / A0h / 12                       |
+       |             |     | Desc: Nominal signalling rate, units of 100MBd. |
+       -----------------------------------------------------------------------
+       | comp_eth    | R   | Name: Trnasceiver compliance code for 1G        |
+       |             |     | Addr: SFF-8472 / A0h / 3                        |
+       |             |     | Desc: Byte-3 Bit 0~3 for 1G defintion           |
+       -----------------------------------------------------------------------
+       | comp_eth_10 | R   | Name: Trnasceiver compliance code for 10G       |
+       |             |     | Addr: SFF-8472 / A0h / 3                        |
+       |             |     | Desc: Byte-3 Bit 5~7 for 10G defintion          |
+       -----------------------------------------------------------------------
+       | comp_extend | R   | Name: Trnasceiver extended compliance code      |
+       |             |     | Addr: SFF-8472 / A0h / 36                       |
+       |             |     | Desc: Byte-36 Bit 0~7                           |
+       -----------------------------------------------------------------------
+       | comp_rev    | R   | Name: SFF-8472 Compliance                       |
+       |             |     | Addr: SFF-8472 / A0h / 94                       |
+       |             |     | Desc: Indicates which revision of SFF-8472 the  |
+       |             |     |       transceiver complies with.                |
+       -----------------------------------------------------------------------
+       | connector   | R   | Name: Connector                                 |
+       |             |     | Addr: SFF-8472 / A0h / 2                        |
+       |             |     | Desc: Type of connector                         |
+       -----------------------------------------------------------------------
+       | hard_rs0    | R/W | Name: RX Hard Rate Select (Via IO Expander)     |
+       |             |     | Addr: Depend on Inventec machine type.          |
+       |             |     | Desc: Read/write bit that allows Hardward rate  |
+       |             |     |       select control. Writing '1' selects full  |
+       |             |     |       bandwidth operation.                      |
+       -----------------------------------------------------------------------
+       | hard_rs1    | R/W | Name: TX Hard Rate Select (Via IO Expander)     |
+       |             |     | Addr: Depend on Inventec machine type.          |
+       |             |     | Desc: Read/write bit that allows software rate  |
+       |             |     |       select control. Writing '1' selects full  |
+       |             |     |       bandwidth operation.                      |
+       -----------------------------------------------------------------------
+       | id          | R   | Name: Identifier                                |
+       |             |     | Addr: SFF-8472 / A0h / 0                        |
+       |             |     | Desc: Type of transceiver                       |
+       -----------------------------------------------------------------------
+       | if_lane     | R   | Name: Inventec Internal Interface               |
+       |             |     | Addr: Depend on Inventec machine type.          |
+       |             |     | Desc: Type of transceiver                       |
+       -----------------------------------------------------------------------
+       | if_type     | R   | Name: Inventec Internal Interface               |
+       |             |     | Addr: Depend on Inventec machine type.          |
+       |             |     | Desc: Provide if_type info for BCM and apps.    |
+       -----------------------------------------------------------------------
+       | if_speed    | R   | Name: Inventec Internal Interface               |
+       |             |     | Addr: Depend on Inventec machine type.          |
+       |             |     | Desc: Provide if_speed info for BCM and apps.   |
+       -----------------------------------------------------------------------
+       | info        | R   | Name: Inventec Internal Interface               |
+       |             |     | Addr: Depend on Inventec machine type.          |
+       |             |     | Desc: Provide detail transceiver and cable type |
+       |             |     |       for BCM and apps.                         |
+       -----------------------------------------------------------------------
+       | len_smf     | R   | Name: Length (single mode)-km                   |
+       |             |     | Addr: SFF-8472 / A0h / 14                       |
+       |             |     | Desc: Link length supported for single mode.    |
+       |             |     |       units of km.                              |
+       -----------------------------------------------------------------------
+       | len_sm      | R   | Name: Length (single mode)-(100's)m             |
+       |             |     | Addr: SFF-8472 / A0h / 15                       |
+       |             |     | Desc: Link length supported for single mode.    |
+       |             |     |       units of 100 m.                           |
+       -----------------------------------------------------------------------
+       | len_om1     | R   | Name: Length (62.5um, OM1)                      |
+       |             |     | Addr: SFF-8472 / A0h / 17                       |
+       |             |     | Desc: Link length supported for OM1 [200 MHz*km |
+       |             |     |       at 850nm, 500 MHz*km at 1310nm] fiber.    |
+       |             |     |       units of 10 m.                            |
+       -----------------------------------------------------------------------
+       | len_om2     | R   | Name: Length (50um, OM2)                        |
+       |             |     | Addr: SFF-8472 / A0h / 16                       |
+       |             |     | Desc: Link length supported for OM2 [500MHz*km  |
+       |             |     |       at 850nm] fiber.                          | 
+       |             |     |       units of 10 m.                            |
+       -----------------------------------------------------------------------
+       | len_om3     | R   | Name: Length (50um, OM3)                        |
+       |             |     | Addr: SFF-8472 / A0h / 19                       |
+       |             |     | Desc: Link length supported for OM3 [2000       |
+       |             |     |       MHz*km] fiber                             |
+       |             |     |       units of km.                              |
+       -----------------------------------------------------------------------
+       | len_om4     | R   | Name: Length (50um, OM4) and Length (Active     |
+       |             |     |       Cable or Copper)                          |
+       |             |     | Addr: SFF-8472 / A0h / 18                       |
+       |             |     | Desc: Link length supported for OM4 [4700 MHz*  |
+       |             |     |       km] fiber.                                |
+       |             |     |       units of 10 m.                            | 
+       -----------------------------------------------------------------------
+       | present     | R   | Name: IO Expander present pin                   |
+       |             |     | Addr: Depend on Inventec machine type.          |
+       |             |     | Desc: Show transceiver exist or not             |
+        ----------------------------------------------------------------------
+       | rate_id     | R   | Name: Rate Identifier                           |
+       |             |     | Addr: SFF-8472 / A0h / 13                       |
+       |             |     | Desc: Type of rate select functionality         |
+       -----------------------------------------------------------------------
+       | rx_power    | R   | Name: RX Power MSB & LSB                        |
+       |             |     | Addr: SFF-8472 / A0h / 104-105                  |
+       |             |     | Desc: Measured RX input power. Range:0-6.5 mW   |
+       |             |     | Note: This feature depend on trnasceiver vendor.|
+       |             |     |       SWPS will show error code if it detect    |
+       |             |     |       transceiver does not supported.           |
+       -----------------------------------------------------------------------
+       | rxlos       | R   | Name: Receiver Loss of Signal                   |
+       |             |     | Addr: Depend on Inventec machine type.          |
+       |             |     | Desc: An adequate optical input results in a low|
+       |             |     |       Rx_LOS output while a high Rx_LOS output  |
+       |             |     |       indicates an unusable optical input.      |
+       -----------------------------------------------------------------------
+       | soft_rs0    | R/W | Name: RX Soft Rate Select (Transceiver side)    |
+       |             |     | Addr: SFF-8472 / A2h / 110 bit-3                |
+       |             |     | Desc: Read/write bit that allows software rate  |
+       |             |     |       select control. Writing '1' selects full  |
+       |             |     |       bandwidth operation.                      |
+       -----------------------------------------------------------------------
+       | soft_rs1    | R/W | Name: TX Soft Rate Select (Transceiver side)    |
+       |             |     | Addr: SFF-8472 / A0h / 118 bit-3                |
+       |             |     | Desc: Read/write bit that allows software rate  |
+       |             |     |       select control. Writing '1' selects full  |
+       |             |     |       bandwidth operation.                      |
+       -----------------------------------------------------------------------
+       | temperature | R   | Name: Temperature MSB & LSB                     |
+       |             |     | Addr: SFF-8472 / A2h / 96                       |
+       |             |     | Desc: Internally measured module temperature.   |
+       |             |     |       Range of -128 ~ +128 (Degrees C)          |
+       |             |     | Note: This feature depend on trnasceiver vendor.|
+       |             |     |       SWPS will show error code if it detect    |
+       |             |     |       transceiver does not supported.           |
+       -----------------------------------------------------------------------
+       | tx_bias     | R   | Name: TX Bias MSB & LSB                         |
+       |             |     | Addr: SFF-8472 / A2h / 100-101                  |
+       |             |     | Desc: Measured transmitter laser bias current.  |
+       |             |     |       Range of 0 to 131 mA.                     |
+       |             |     | Note: This feature depend on trnasceiver vendor.|
+       |             |     |       SWPS will show error code if it detect    |
+       |             |     |       transceiver does not supported.           |
+       -----------------------------------------------------------------------
+       | tx_disalbe  | R/W | Name: TX Disable                                |
+       |             |     | Addr: Depend on Inventec machine type.          |
+       |             |     | Desc: Disable Tx output signals.                |
+       |             |     |       0 is enable, 1 is disable.                |
+       -----------------------------------------------------------------------
+       | tx_fault    | R   | Name: TX Fault                                  |
+       |             |     | Addr: Depend on Inventec machine type.          |
+       |             |     | Desc: The output indicates LOW when the         |
+       |             |     |       transmitter is operating normally, and    |
+       |             |     |       HIGH with a laser fault including laser   |
+       |             |     |       end-of-life.                              |
+       -----------------------------------------------------------------------
+       | tx_power    | R   | Name: TX Power MSB & LSB                        |
+       |             |     | Addr: SFF-8472 / A2h / 102-103                  |
+       |             |     | Desc: Measured TX output power.                 |
+       |             |     | Note: This feature depend on trnasceiver vendor.|
+       |             |     |       SWPS will show error code if it detect    |
+       |             |     |       transceiver does not supported.           |
+       -----------------------------------------------------------------------
+       | vendor_name | R   | Name: Vendor name                               |
+       |             |     | Addr: SFF-8472 / A0h / 20-35                    |
+       |             |     | Desc: SFP vendor name (ASCII)                   |
+       -----------------------------------------------------------------------
+       | vendor_pn   | R   | Name: Vendor PN                                 |
+       |             |     | Addr: SFF-8472 / A0h / 40-55                    |
+       |             |     | Desc: Part number provided by SFP vendor (ASCII)|
+       -----------------------------------------------------------------------
+       | vendor_rev  | R   | Name: Vendor rev                                |
+       |             |     | Addr: SFF-8472 / A0h / 56-59                    |
+       |             |     | Desc: Revision level for part number provided   |
+       |             |     |       by vendor (ASCII)                         |
+       -----------------------------------------------------------------------
+       | vendor_sn   | R   | Name: Vendor SN                                 |
+       |             |     | Addr: SFF-8472 / A0h / 68-83                    |
+       |             |     | Desc: Serial number provided by vendor (ASCII)  |
+       -----------------------------------------------------------------------
+       | voltage     | R   | Name: Vcc MSB & LSB                             |
+       |             |     | Addr: SFF-8472 / A0h / 98-99                    |
+       |             |     | Desc: Internally measured supply voltage in     |
+       |             |     |       transceiver.                              |
+       |             |     | Note: This feature depend on trnasceiver vendor.|
+       |             |     |       SWPS will show error code if it detect    |
+       |             |     |       transceiver does not supported.           |
+       -----------------------------------------------------------------------
+       | wavelength  | R   | Name: Laser wavelength                          |
+       |             |     | Addr: SFF-8472 / A0h / 60-61                    |
+       |             |     | Desc: Laser wavelength (Passive/Active Cable    |
+       |             |     |       Specification Compliance)                 |
+       -----------------------------------------------------------------------
+   => Note: Some atributes are depend on Hardware (Platform) type.
+      
+      
+   2.3 QSFP Port Directory Tree and Attributes:
+   => /sys/class/swps/port<NUM>
+                        |-- br
+                        |-- cdr (QSFP28 only)
+                        |-- comp_eth
+                        |-- comp_eth_10_40
+                        |-- comp_extend
+                        |-- comp_rev
+                        |-- connector
+                        |-- id
+                        |-- if_lane
+                        |-- if_speed
+                        |-- if_type
+                        |-- info
+                        |-- len_smf
+                        |-- len_om1
+                        |-- len_om2
+                        |-- len_om3
+                        |-- len_om4
+                        |-- lpmod
+                        |-- modsel
+                        |-- power_cls
+                        |-- present
+                        |-- reset
+                        |-- rx_power
+                        |-- soft_rx_los
+                        |-- soft_tx_disable
+                        |-- soft_tx_fault
+                        |-- temperature
+                        |-- tx_bias
+                        |-- tx_power
+                        |-- vendor_name
+                        |-- vendor_pn
+                        |-- vendor_rev
+                        |-- vendor_sn
+                        |-- voltage
+                        `-- wavelength
+                        
+   =>  ---------------------------------------------------------------------------
+       | Attribute       |     | Description                                     |
+       ---------------------------------------------------------------------------
+       | br              | R   | Name: BR, nominal                               |
+       |                 |     | Addr: SFF-8636 / 00h / 140                      |
+       |                 |     | Desc: Nominal signalling rate, units of 100MBd. |
+       ---------------------------------------------------------------------------
+       | cdr             | R/W | Name: CDR control                               |
+       |                 |     | Addr: SFF-8636 / 00h / 98                       |
+       |                 |     | Desc: 100G QSFP28                               |
+       ---------------------------------------------------------------------------
+       | comp_eth        | R   | Name: Trnasceiver compliance code for 1G        |
+       |                 |     | Addr: SFF-8636 / 00h / 134                      |
+       |                 |     | Desc: Byte-134 Bit 0~3 for 1G defintion         |
+       ---------------------------------------------------------------------------
+       | comp_eth_10_40  | R   | Name: Trnasceiver compliance code for 10/40G    |
+       |                 |     | Addr: SFF-8636 / 00h / 131                      |
+       |                 |     | Desc: 10/40G Ethernet Compliance Codes          |
+       ---------------------------------------------------------------------------
+       | comp_extend     | R   | Name: Trnasceiver extended compliance code      |
+       |                 |     | Addr: SFF-8636 / 00h / 192                      |
+       |                 |     | Desc: Extended Specification Compliance Codes   |
+       |                 |     |       (See SFF-8024 Transceiver Management)     |                     |
+       ---------------------------------------------------------------------------
+       | comp_rev        | R   | Name: Revision Compliance                       |
+       |                 |     | Addr: SFF-8636 / 00h / 1                        |
+       |                 |     | Desc: Indicates which revision of SFF-8472 the  |
+       |                 |     |       transceiver complies with.                |
+       ---------------------------------------------------------------------------
+       | connector       | R   | Name: Connector                                 |
+       |                 |     | Addr: SFF-8636 / 00h / 130                      |
+       |                 |     | Desc: Type of connector                         |
+       ---------------------------------------------------------------------------
+       | id              | R   | Name: Identifier                                |
+       |                 |     | Addr: SFF-8636 / 00h / 0 & 128                  |
+       |                 |     | Desc: Type of transceiver                       |
+       ---------------------------------------------------------------------------
+       | if_lane         | R   | Name: Inventec Internal Interface               |
+       |                 |     | Addr: Depend on Inventec machine type.          |
+       |                 |     | Desc: Type of transceiver                       |
+       ---------------------------------------------------------------------------
+       | if_type         | R   | Name: Inventec Internal Interface               |
+       |                 |     | Addr: Depend on Inventec machine type.          |
+       |                 |     | Desc: Provide if_type info for BCM and apps.    |
+       ---------------------------------------------------------------------------
+       | if_speed        | R   | Name: Inventec Internal Interface               |
+       |                 |     | Addr: Depend on Inventec machine type.          |
+       |                 |     | Desc: Provide if_speed info for BCM and apps.   |
+       ---------------------------------------------------------------------------
+       | info            | R   | Name: Inventec Internal Interface               |
+       |                 |     | Addr: Depend on Inventec machine type.          |
+       |                 |     | Desc: Provide detail transceiver and cable type |
+       |                 |     |       for BCM and apps.                         |
+       ---------------------------------------------------------------------------
+       | len_smf         | R   | Name: Length (single mode)-km                   |
+       |                 |     | Addr: SFF-8636 / 00h / 142                      |
+       |                 |     | Desc: Link length supported for SMF fiber in km |
+       |                 |     |       units of KM.                              |
+       ---------------------------------------------------------------------------
+       | len_om1         | R   | Name: Length (62.5um, OM1)                      |
+       |                 |     | Addr: SFF-8636 / 00h / 145                      |
+       |                 |     | Desc: Link length supported for OM1 [200 MHz*km |
+       |                 |     |       at 850nm, 500 MHz*km at 1310nm] fiber.    |
+       |                 |     |       units of 1 m.                             |
+       ---------------------------------------------------------------------------
+       | len_om2         | R   | Name: Length (50um, OM2)                        |
+       |                 |     | Addr: SFF-8636 / 00h / 144                      |
+       |                 |     | Desc: Link length supported for OM2 [500MHz*km  |
+       |                 |     |       at 850nm] fiber.                          | 
+       |                 |     |       units of 1 m.                             |
+       ---------------------------------------------------------------------------
+       | len_om3         | R   | Name: Length (50um, OM3)                        |
+       |                 |     | Addr: SFF-8636 / 00h / 143                      |
+       |                 |     | Desc: Link length supported for OM3 [2000       |
+       |                 |     |       MHz*km] fiber                             |
+       |                 |     |       units of 2m.                              |
+       ---------------------------------------------------------------------------
+       | len_om4         | R   | Name: Length (50um, OM4) and Length (Active     |
+       |                 |     |       Cable or Copper)                          |
+       |                 |     | Addr: SFF-8636 / 00h / 146                      |
+       |                 |     | Desc: Length of passive or active cable assembly|
+       |                 |     |       (units of 1 m) or link length supported   |
+       |                 |     |       for OM4 50/125 um fiber (units of 2m) as  |
+       |                 |     |       indicated by Byte 147. See 6.3.12.        |
+       ---------------------------------------------------------------------------
+       | lpmod           | R/W | Name: IO Expander lpmod pin                     |
+       |                 |     | Addr: Depend on Inventec machine type.          |
+       |                 |     | Desc: Please reference SFF-8438 LPMode.         |
+       |                 |     |       1 is Low power mode                       |
+       |                 |     |       0 is High power mode                      |
+       ---------------------------------------------------------------------------
+       | modsel          | R/W | Name: IO Expander modsel pin                    |
+       |                 |     | Addr: Depend on Inventec machine type.          |
+       |                 |     | Desc: Please reference SFF-8438 ModSelL.        |
+       |                 |     |       The ModSelL is an input pin. When held    |
+       |                 |     |       low by the host, the module responds to   |
+       |                 |     |       2-wire serial communication commands.     |
+       ---------------------------------------------------------------------------
+       | power_cls       | R   | Name: Thrasceiver Power Class                   |
+       |                 |     | Addr: SFF-8636 / 00h / 129 Bit 0-1, 6-7         |
+       |                 |     | Desc: Class-1 (1.5W) ~ Class-7 (5W)             |
+       ---------------------------------------------------------------------------
+       | present         | R   | Name: IO Expander present pin                   |
+       |                 |     | Addr: Depend on Inventec machine type.          |
+       |                 |     | Desc: Show transceiver exist or not             |
+       ---------------------------------------------------------------------------
+       | reset           | R/W | Name: IO Expander reset pin                     |
+       |                 |     | Addr: Depend on Inventec machine type.          |
+       |                 |     | Desc: Please reference SFF-8438 ResetL.         |
+       ---------------------------------------------------------------------------
+       | rx_power        | R   | Name: RX Power MSB & LSB                        |
+       |                 |     | Addr: SFF-8636 / 00h / 34-41                    |
+       |                 |     | Desc: Measured RX input power. Range:0-6.5 mW   |
+       |                 |     | Note: This feature depend on trnasceiver vendor.|
+       |                 |     |       SWPS will show error code if it detect    |
+       |                 |     |       transceiver does not supported.           |
+       ---------------------------------------------------------------------------
+       | soft_rx_los     | R   | Name: Receiver Loss of Signal (Trnasceiver      |
+       |                 |     |       internal)                                 |
+       |                 |     | Addr: SFF-8636 / 00h / 3                        |
+       |                 |     | Desc: Latched RX LOS indicator.                 |
+       |                 |     |       Byte 3, Bit 0-3 mapping to channel 1-4    |
+       ---------------------------------------------------------------------------
+       | soft_tx_disable | R/W | Name: TX Disable (Trnasceiver internal)         |
+       |                 |     | Addr: SFF-8636 / 00h / 86                       |
+       |                 |     | Desc: Bit 0-3 mapping to channel 1-4            |
+       ---------------------------------------------------------------------------
+       | soft_tx_fault   | R   | Name: TX Fault (Trnasceiver internal)           |
+       |                 |     | Addr: SFF-8636 / 00h / 3                        |
+       |                 |     | Desc: Bit 0-3 mapping to channel 1-4            |
+       ---------------------------------------------------------------------------
+       | temperature     | R   | Name: Temperature MSB & LSB                     |
+       |                 |     | Addr: SFF-8636 / 00h / 22-23                    |
+       |                 |     | Desc: Internally measured module temperature.   |
+       |                 |     |       Range of -128 ~ +128 (Degrees C)          |
+       |                 |     | Note: This feature depend on trnasceiver vendor.|
+       |                 |     |       SWPS will show error code if it detect    |
+       |                 |     |       transceiver does not supported.           |
+       ---------------------------------------------------------------------------
+       | tx_bias         | R   | Name: TX Bias MSB & LSB                         |
+       |                 |     | Addr: SFF-8636 / 00h / 42-49                    |
+       |                 |     | Desc: Measured transmitter laser bias current.  |
+       |                 |     |       Range of 0 to 131 mA.                     |
+       |                 |     | Note: This feature depend on trnasceiver vendor.|
+       |                 |     |       SWPS will show error code if it detect    |
+       |                 |     |       transceiver does not supported.           |
+       ---------------------------------------------------------------------------
+       | tx_power        | R   | Name: TX Power MSB & LSB                        |
+       |                 |     | Addr: SFF-8636 / 00h / 50-57                    |
+       |                 |     | Desc: Measured TX output power.                 |
+       |                 |     | Note: This feature depend on trnasceiver vendor.|
+       |                 |     |       SWPS will show error code if it detect    |
+       |                 |     |       transceiver does not supported.           |
+       ---------------------------------------------------------------------------
+       | vendor_name     | R   | Name: Vendor name                               |
+       |                 |     | Addr: SFF-8636 / 00h / 148-163                  |
+       |                 |     | Desc: SFP vendor name (ASCII)                   |
+       ---------------------------------------------------------------------------
+       | vendor_pn       | R   | Name: Vendor PN                                 |
+       |                 |     | Addr: SFF-8636 / 00h / 168-183                  |
+       |                 |     | Desc: Part number provided by SFP vendor (ASCII)|
+       ---------------------------------------------------------------------------
+       | vendor_rev      | R   | Name: Vendor rev                                |
+       |                 |     | Addr: SFF-8636 / 00h / 184-185                  |
+       |                 |     | Desc: Revision level for part number provided   |
+       |                 |     |       by vendor (ASCII)                         |
+       ---------------------------------------------------------------------------
+       | vendor_sn       | R   | Name: Vendor SN                                 |
+       |                 |     | Addr: SFF-8636 / 00h / 196-211                  |
+       |                 |     | Desc: Serial number provided by vendor (ASCII)  |
+       ---------------------------------------------------------------------------
+       | voltage         | R   | Name: Vcc MSB & LSB                             |
+       |                 |     | Addr: SFF-8636 / 00h / 26-27                    |
+       |                 |     | Desc: Internally measured supply voltage in     |
+       |                 |     |       transceiver.                              |
+       |                 |     | Note: This feature depend on trnasceiver vendor.|
+       |                 |     |       SWPS will show error code if it detect    |
+       |                 |     |       transceiver does not supported.           |
+       ---------------------------------------------------------------------------
+       | wavelength      | R   | Name: Wavelength or Copper Cable Attenuation    |
+       |                 |     | Addr: SFF-8636 / A0h / 186-187                  |
+       |                 |     | Desc: Nominal laser wavelength (wavelength =    |
+       |                 |     | value/20 in nm) or copper cable attenuation in  |
+       |                 |     | dB at 2.5 GHz (Byte 186) and 5.0GHz (Byte 187)  |
+       ---------------------------------------------------------------------------
+   => Note: Some atributes are depend on Hardware (Platform) type.
+      
+   2.4 SWPS Module Control and Information Interface:
+   => /sys/class/swps/module
+                        |-- platform
+                        |-- version
+                        `-- reset_swps
+
+   =>  -----------------------------------------------------------------------
+       | Attribute   |     | Description                                     |
+       -----------------------------------------------------------------------
+       | platform    | R   | Name: Inventec platform name                    |
+       |             |     | Desc: Provide platform type which SWPS is       |
+       |             |     |       running.                                  |
+       -----------------------------------------------------------------------
+       | version     | R   | Name: SWPS version                              |
+       |             |     | Desc: Provide SWPS version information.         |
+       -----------------------------------------------------------------------
+       | reset_swps  | W   | Name: SWPS reset interface                      |
+       |             |     | Desc: This interface can trigger SWPS driver to |
+       |             |     |       re-initial. You should write the correct  |
+       |             |     |       password to this interface, then SWPS     |
+       |             |     |       will re-initial.                          |
+       -----------------------------------------------------------------------
+      
+   2.5 Automatic Event Handling (POLLING_MODE Only)
+   => When SWPS running on "POLLING_MODE", it will automatic handle event of 
+      user plug/remove/swap transceiver. The descriptions for handling actions 
+      as below: 
+      ========================================================================
+      | Event              |  Handling Actions                               |
+      ========================================================================
+      | Plug transceiver   | 1. Detect and verify.                           |
+      |                    | 2. Adjust system settings (Ex: LP/HP mode)      |
+      |                    | 3. Setup transceiver functions (Ex: CDR)        |
+      |                    | 4. Log plug-transceiver event and transceiver   |
+      |                    |    information.                                 |
+      |                    | 5. Send uevent to notify userspace.             |
+      ------------------------------------------------------------------------
+      | Swap transceiver   | 1. Detect and verify.                           |
+      |                    | 2. Renew sysfs interface and internal handling  |
+      |                    |    mechanism.                                   |
+      |                    | 3. Log swap-transceiver event and transceiver   |
+      |                    |    information.                                 |
+      |                    | 4. Adjust system settings (Ex: LP/HP mode)      |
+      |                    | 5. Setup transceiver functions (Ex: CDR)        |
+      |                    | 6. Send uevent to notify userspace.             |
+      ------------------------------------------------------------------------
+      | Remove tramsceiver | 1. Log remove-transceiver event.                |
+      |                    | 2. Send uevent to notify userspace.             |
+      ------------------------------------------------------------------------
+
+   2.6 Automatic Power Mode Handling (POLLING_MODE Only)
+   => When SWPS under "POLLING_MODE", it will detect transceiver power class 
+      then adjust power mode to fit requirement automatically. 
+      The handle rule as below:
+      ========================================================================
+      | Transceiver Power Class        |  System Power Mode                  |
+      ========================================================================
+      | Power Class 1                  |  Low power mode                     |
+      ------------------------------------------------------------------------
+      | Power Class 2 ~ 7              |  High power mode                    |
+      ------------------------------------------------------------------------       
+
+   2.7 Automatic Transceiver Setup (POLLING_MODE Only)
+   => SWPS will automatic setup pre-define configurations to transceiver when 
+      user plug it. 
+      The pre-define configuration list as below:
+      ========================================================================
+      | Transceiver Type       |  Pre-define Configuration                   |
+      ========================================================================
+      | SFP multi-Rate         |  Dynamic detect and setup transceiver mode  |
+      |                        |  to fit system settings.                    |
+      ------------------------------------------------------------------------
+      | SFP 1G copper          |  Dynamic detect and sync up external phy    |
+      |                        |  state. (Need additional user-space app)    |               | 
+      ------------------------------------------------------------------------
+      | QSFP                   |  Dynamic detect and setup power mode.       |
+      ------------------------------------------------------------------------
+      | QSFP                   |  Dynamic detect and Setup BCM interface     |
+      |                        |  configurations (Need additional user-space |
+      |                        |  app)                                       |
+      ------------------------------------------------------------------------
+      | QSFP28-100G            |  Dynamic detect and CDR enable.             |
+      ------------------------------------------------------------------------
+
+   2.8 Transceiver Information Dumper (POLLING_MODE only)  
+   => SWPS driver can dump the transceiver information when it detect user plug
+      transceiver event, then keeps log data in syslog. 
+      The dump items and example as below:
+   => Log example:
+      [SWPS] Dump transceiver information: port52
+       => <Type>:QSFP+
+       => <VenderName>:FINISAR CORP.   
+       => <VenderPN>:FTL4C1QE1C      
+       => <VenderREV>:A1
+       => <VenderSN>:UT80G0V         
+       => <PowerClass>:Class_4
+       => <BitRate>:0x67
+       => <Len50um>:0
+       => <Len62.5um>:0
+       => <rev_comp>:0x00
+        
+   2.9 Event Notification (POLLING_MODE only)  
+   => SWPS supports Linux uevent mechanism. SWPS will send uevent to notify userspace 
+      when it detect user plug or remove the transceiver. Userspace app can leverage 
+      this feature to know event occurs, and implement additional handle features.
+      
+   => Currently, SWPS support two type of uevent transceiver "ADD" and transceiver 
+      "REMOVE". The uevent massage example as below:
+      
+   => Example: "ADD" uevent message
+        add@/devices/virtual/swps/port48
+        ACTION=add
+        DEVPATH=/devices/virtual/swps/port48
+        SUBSYSTEM=swps
+        IF_TYPE=SR4
+        IF_SPEED=100000
+        IF_LANE=81,82,83,84
+        MAJOR=250
+        MINOR=48
+        DEVNAME=port48
+        SEQNUM=4881
+        
+   => Example: "REMOVE" uevent message
+        remove@/devices/virtual/swps/port48
+        ACTION=remove
+        DEVPATH=/devices/virtual/swps/port48
+        SUBSYSTEM=swps
+        IF_TYPE=UNKNOW
+        IF_SPEED=UNKNOW
+        IF_LANE=81,82,83,84
+        MAJOR=250
+        MINOR=48
+        DEVNAME=port48
+        SEQNUM=4880
+      
+   2.10 Automatic Rate Select Handling (POLLING_MODE Only)
+   => SWPS support automatic rate select handling for muti-rate mode transceiver. It  
+      will automatic enable and setup transceiver Rate_Select function when it detect
+      multi-rate transceiver been plugged in. The support list as below:
+      ========================================================================
+      | Rate ID | Type   | Spec     | Description                            |
+      ========================================================================
+      | 0x02    | SFP    | SFF-8431 | SFF-8431 (8/4/2G Rx Rate_Select only)  |
+      ------------------------------------------------------------------------
+      | 0x04    | SFP    | SFF-8431 | SFF-8431 (8/4/2G Tx Rate_Select only)  |
+      ------------------------------------------------------------------------
+      | 0x06    | SFP    | SFF-8431 | SFF-8431 (8/4/2G Independent Rx &      |
+      |         |        |          | Tx Rate_select)                        |
+      ------------------------------------------------------------------------
+
+   2.11 Automatic handle mechansim for I2C topology.
+   => SWAPS responsible to monitor the status of I2C topology. It will trigger recover 
+      mechanism when it detect the I2C crash event. The recover procedure as below:
+      (1) SWPS detect I2C crash event
+      (2) Reset I2C topology.
+      (3) Find out the root cause port and isolate it.
+
+
+3. NOTE
+
+   3.1 Supported Platform and Transceiver:
+   => ========================================================================
+      | Platform      |  Supported Transceiver                               |
+      ========================================================================
+      | Magnolia      |  Port  1~48: SFP, SFP+                               |
+      |               |  Port 49~54: QSFP, QSFP+                             |
+      ------------------------------------------------------------------------
+      | Redwood_x86   |  Port  1~32: QSFP, QSFP+, QSFP28                     |
+      ------------------------------------------------------------------------
+      | Hudson_32i    |  Port  1~32: QSFP, QSFP+                             |
+      ------------------------------------------------------------------------
+      | Spruce        |  Port 49~54: QSFP, QSFP+                             |
+      ------------------------------------------------------------------------
+      | Cypress       |  Port  1~48: SFP, SFP+, SFP28                        |
+      |               |  Port 49~54: QSFP, QSFP+, QSFP28                     |
+      ------------------------------------------------------------------------
+
+   3.2 Adjust Running Mode
+   => You can select POLLING_MODE or NON_POLLING_MODE via modify SWP_POLLING_ENABLE 
+      variable which is in inv_swps.h as below:
+      #define SWP_POLLING_ENABLE (0)  /* NON_POLLING_ENABLE */
+      #define SWP_POLLING_ENABLE (1)  /* POLLING_ENABLE */
+   
+   3.3 Adjust Platform Type
+   => You should configure the correct platform type to PLATFORM_SETTINGS variable
+      which is in inv_swps.h. The following example is Redwood's configuration.
+      #define PLATFORM_SETTINGS   PLATFORM_TYPE_REDWOOD
+      
+
+4. CHANGE LOG
+   ------------------------------------------------------------------------
+   * Version: 4.3.1
+   * Date   : 2018/07/20
+   * Bug Fixed::
+     1. Repease procedure and reference count issues.
+   * New Feature:
+     1. Supported new platform: Peony-SFP, Peony-Copper.
+     2. Supported SKU auto-detect for Peony.
+     3. Supported I2C topology reset via CPLD.
+     4. Supported I2C topology handling for RANGELEY platform.
+     5. Solved defect of i2c-gpio return abnormal value when I2C crash.
+   ------------------------------------------------------------------------
+   * Version: 4.2.10
+   * Date   : 2018/06/26
+   * New Feature:
+     1. Support new platform: Gulmohar.
+   ------------------------------------------------------------------------
+   * Version: 4.2.9
+   * Date   : 2018/01/19
+   * New Feature:
+     1. Support new platform: Maple.
+   ------------------------------------------------------------------------
+   * Version: 4.2.8
+   * Date   : 2018/01/12
+   * New Feature:
+     1. Support new platform: Cottonwood.
+   ------------------------------------------------------------------------
+   * Version: 4.2.7
+   * Date   : 2017/11/07
+   * New Feature:
+     1. New sysfs interface for SFP port:
+        > extphy_offset, extphy_reg
+   ------------------------------------------------------------------------
+   * Version: 4.2.6
+   * Date   : 2017/10/25
+   * New Feature:
+     1. Support new platform: Lavender.
+   ------------------------------------------------------------------------
+   * Version: 4.2.5
+   * Date   : 2017/10/17
+   * Bug Fixed::
+     1. Bug 2647: [Magnolia][Drivers]Sysfs write 0 to tx_enable fail for 
+                  ports 29-32. It works for other ports
+   ------------------------------------------------------------------------
+   * Version: 4.2.4
+   * Date   : 2017/09/06
+   * New Feature:
+     1. Support new platform: Tahoe, Sequoia.
+   ------------------------------------------------------------------------
+   * Version: 4.2.3
+   * Date   : 2017/05/31
+   * Update:
+     1. Cache mode for read vendor relate attributes
+   ------------------------------------------------------------------------
+   * Version: 4.2.2
+   * Date   : 2017/05/05
+   * Update:
+     1. I2C topology handle mechanism
+        - Support all platform: Cypress, Magnolia, Redwood, Spruce, Hudson32i.
+
+   ------------------------------------------------------------------------
+   * Version: 4.2.1
+   * Date   : 2017/04/27
+   * Update:
+     1. Remove transceiver EQ handle mechanism.
+
+   ------------------------------------------------------------------------
+   * Version: 4.0.5
+   * Date   : 2017/03/27
+   * New Feature:
+     1. Dynamic adjust transceiver EQ and relate tuning value.
+     2. Support all transceiver and AOC of Baidu AVL List-1 & 2.
+     3. Auto handling mechanism for tx_disable state.
+
+   * Bug Fixed:
+     1. Bug 2271: Transceiver timing issues for QSFP auto tx disable mechanism
+   ------------------------------------------------------------------------
+   * Version: 4.0
+   * Date   : 2016/11/28
+   * New Feature:
+     1. I2C topology handle mechanism
+        - Support platform type: Cypress.
+     2. SysFS interface: reset_i2c
+     
+   * Update:
+     1. Enhance fault tolerance features for transceiver relate issues.
+     2. Enhance state machine.
+        
+   * Bug Fixed:
+     1. I2C relate bugs
+   ------------------------------------------------------------------------
+   * Version: 3.2
+   * Date   : 2016/09/23
+   * New Feature:
+     1. Sysfs interface:
+        > SFP port : 
+            comp_extend
+        > QSFP port:
+            soft_rx_los, soft_tx_disable, soft_tx_fault
+     2. Support platform type: Redwood FSL, Cypress INV, Cypress Baidu, Magnolia FNC.
+     3. Support Linux kernel version 3.10.x ~ 3.16.x
+     4. Fault tolerance features for I2C relate issues.
+     
+   * Update:
+     1. Enhance fault tolerance features for transceiver relate issues.
+     2. Enhance state machine.
+     3. Modify checking policy of SWPS initial procedure. 
+        > This version, SWPS won't stop initial procedure if user inserted the INVALID 
+          transceiver before bootup switch.
+        
+   * Bug Fixed:
+     1. Bug 1905 - [Magnolia]When plug in 1G copper SFP, console displays 
+                   "i2c_smbus_read_byte_data fail" continuously
+   ------------------------------------------------------------------------
+   * Version: 3.1
+   * Date   : 2016/06/20
+   * New Feature:
+     1. Sysfs interface:
+         > SFP port : 
+             if_lane, len_sm, len_smf, len_om1, len_om2, len_om3, len_om4, 
+             comp_eth, comp_eth_10, ext_id, wavelength, connector
+         > QSFP port: 
+             if_lane, temperature, voltage, tx_bias, tx_power, rx_power, 
+             len_smf, len_om1, len_om2, len_om3, len_om4, comp_eth, comp_eth_10_40, 
+             ext_id, wavelength, connector
+     2. Provide physical port to lane id mapping information.
+     3. IO Expander polling retry and handle mechanism for case of i2c smbus unstable. 
+     4. Provide infomation for iCOS and SWPS user space daemon.
+     
+   * Update:
+     1. Add new attribute in uevent:
+        - IF_LANE: Physical port to Lane id information.
+     2. Interface rename:
+        - rev_comp   => comp_rev
+        - len_50um   => len_om2
+        - len_62_5um => len_om1
+        
+   * Bug Fixed:
+     1. None
+   ------------------------------------------------------------------------
+   * Version: 3.0
+   * Date   : 2016/05/19
+   * New Feature:
+     1. Sysfs interface: platform, version, reset_swps, info, if_type, 
+                         if_speed. 
+     2. Transceiver and cable identify mechanism. 
+        - QSFP identify features:
+          > 10G optical: SR, LR, LRM
+          > 10G copper, DAC
+          > 40G optical: LR4, SR4, CR4, Active cable, ER4, PSM4
+          > 40G copper, DAC
+          > 100G optical : SR4, LR4, ER4, SR10, CWDM4, PSM4, CLR4
+          > 100G copper: ACC, CR4, DAC
+        - SFP identify features:
+          > 1G optical: SX, LX,
+          > 1G copper, CX, BaseT
+          > 10G optical: SR, LR, LRM, ER, AOC
+          > 10G copper, DAC
+          > 25G optical : SR, LR, ER, AOC,
+          > 25G copper: ACC, CR, 
+         - Connector identify feature:
+          > LC
+          > Optical pigtail
+          > Copper pigtail,  
+          > MPO 1x12
+          > MPO 2x16
+          > No separable connector
+     3. Link state monitor mechanism for RJ-45 transceiver.
+      
+   * Update:
+     1. Add new attribute in uevent:
+        - IF_TYPE : BCM interface type. (By chipset)
+        - IF_SPEED: Transceiver speed information.
+     2. Enhance SWPS long-tern task handling.
+ 
+   * Bug Fixed:
+     1. Bug 928  - [Magnolia DVT][Port]Port status display incorrect on 1G 
+                   speed mode when plug in "Finisar" and "Delta" copper SFP. 
+     2. Bug 1133 - [Magnolia DVT][Port]Port status display incorrect on 1G 
+                   speed mode when plug in "AVAGO" 1G copper SFP.
+     3. Bug 1519 - [Redwood DVT2] [Port mode] DAC cable could not link up on 
+                   Redwood 3.2.1.1
+   ------------------------------------------------------------------------
+   * Version: 2.5
+   * Date   : 2016/04/06
+   * New Feature:
+     1. Sysfs interface: temperature, voltage, tx_bias, tx_power, rx_power
+     2. Automatic Rate Select handling:
+        2.1 SFF-8431 (8/4/2G Rx Rate_Select only)
+        2.2 SFF-8431 (8/4/2G Tx Rate_Select only)
+        2.3 SFF-8431 (8/4/2G Independent Rx & Tx Rate_select) 
+   * Update:
+     1. None
+   * Bug Fixed:
+     1. Bug 1076 - [Magnolia DVT][Transceiver]Finisar FTLX8571D3BCV 1G/10G 
+        Dual-Rate SFP+ transceiver can't link up on 10G mode. 
+   ------------------------------------------------------------------------
+   * Version: 2.4
+   * Date   : 2016/03/30
+   * New Feature:
+     1. Support platform type: Cypress.
+     2. Support transceiver type: SFP28.
+     3. Sysfs interface: rate_id, soft_rs0, soft_rs1, hard_rs0, hard_rs1
+   * Update:
+     1. None
+   * Bug Fixed:
+     1. None
+   ------------------------------------------------------------------------
+   * Version: 2.3
+   * Date   : 2016/03/14
+   * New Feature:
+     1. Support platform type: Spruce.
+   * Update:
+     1. None
+   * Bug Fixed:
+     1. None
+   ------------------------------------------------------------------------
+   * Version: 2.2
+   * Date   : 2016/03/03
+   * New Feature:
+     1. Support platform type: Hudson32i.
+     2. Transceiver Information Dumper.
+   * Update:
+     1. Enhance automatic power mode handling:
+     => Support special transceiver power_class format (Class 5-7) which 
+        is not following Finisar.
+   * Bug Fixed:
+     1. Bug-1438: [Redwood] [Transceiver] 100G LR4 transceiver can not 
+        link up on Redwood
+   ------------------------------------------------------------------------
+   * Version: 2.1
+   * Date   : 2016/01/29
+   * New Feature:
+     1. Event Notification.
+     2. Add sysfs interface attribute: power_cls
+   * Update:
+     1. Enhance automatic power mode handling:
+     => Dynamic power mode control.
+     => Protect mechanism (delay 0.6 sec to pull high).
+   * Bug Fixed:
+     1. None
+   ------------------------------------------------------------------------
+   * Version: 2.0
+   * Date   : 2016/01/22
+   * New Feature:
+     1. Support platform type: Redwood.
+     2. Support transceiver type: QSFP28.
+     3. Automatic event handling.
+     4. Automatic power mode handling.
+     5. Automatic transceiver setup.
+     6. Add sysfs interface attribute: cdr.
+   * Update:
+     1. None
+   * Bug Fixed:
+     1. Bug-1279: [Magnolia DVT][Transceiver]Finisar LR4 can't link up on 
+        ICOS and BCM mode.
+   ------------------------------------------------------------------------
+   * Version: 1.0
+   * Date   : 2015/11/24
+   * New Feature:
+     1. Sysfs interface.
+     2. Support platform type: Magnolia.
+     3. Support transceiver type: SFP, SFP+, QSFP, QSFP+.
+   * Update:
+     1. None
+   * Bug Fixed:
+     1. None
+   ------------------------------------------------------------------------
+
+
+
+
+
+
+

@@ -2,7 +2,6 @@
 #
 # Platform-specific SFP transceiver interface for SONiC
 #
-
 #
 # INV_FIX-4037
 # (1) Support get_transceiver_change_event.
@@ -15,8 +14,8 @@
 try:
     import time
     import socket, re,os
-    from collections import OrderedDict
     from sonic_sfp.sfputilbase import SfpUtilBase
+    from collections import OrderedDict
     from sonic_sfp.sff8472 import sff8472Dom
 except ImportError as e:
     raise ImportError("%s - required module not found" % str(e))
@@ -275,7 +274,6 @@ class SfpUtil(SfpUtilBase):
         reg_file.close()
 
         return True
-
 #
 # INV_FIX-4037
 # (1) Support get_transceiver_change_event.
@@ -315,10 +313,24 @@ class SfpUtil(SfpUtilBase):
             return self._read_eeprom_devid(port_num, self.DOM_EEPROM_ADDR, 256)
 
     def get_transceiver_dom_info_dict(self, port_num):
-        if port_num in self.qsfp_ports:
+        if port_num in self.qsfp_ports or port_num in self.osfp_ports:
             return SfpUtilBase.get_transceiver_dom_info_dict(self, port_num)
         else:
             transceiver_dom_info_dict = {}
+            transceiver_dom_info_dict['temperature'] = 'N/A'
+            transceiver_dom_info_dict['voltage'] = 'N/A'
+            transceiver_dom_info_dict['rx1power'] = 'N/A'
+            transceiver_dom_info_dict['rx2power'] = 'N/A'
+            transceiver_dom_info_dict['rx3power'] = 'N/A'
+            transceiver_dom_info_dict['rx4power'] = 'N/A'
+            transceiver_dom_info_dict['tx1bias'] = 'N/A'
+            transceiver_dom_info_dict['tx2bias'] = 'N/A'
+            transceiver_dom_info_dict['tx3bias'] = 'N/A'
+            transceiver_dom_info_dict['tx4bias'] = 'N/A'
+            transceiver_dom_info_dict['tx1power'] = 'N/A'
+            transceiver_dom_info_dict['tx2power'] = 'N/A'
+            transceiver_dom_info_dict['tx3power'] = 'N/A'
+            transceiver_dom_info_dict['tx4power'] = 'N/A'
 
             offset = 256
             file_path = self._get_port_eeprom_path(port_num, self.DOM_EEPROM_ADDR)
@@ -339,19 +351,19 @@ class SfpUtil(SfpUtilBase):
             if dom_temperature_raw is not None:
                 dom_temperature_data = sfpd_obj.parse_temperature(dom_temperature_raw, 0)
             else:
-                return None
+                return transceiver_dom_info_dict
 
             dom_voltage_raw = self._read_eeprom_specific_bytes(sysfsfile_eeprom, (offset + SFP_VLOT_OFFSET), SFP_VOLT_WIDTH)
             if dom_voltage_raw is not None:
                 dom_voltage_data = sfpd_obj.parse_voltage(dom_voltage_raw, 0)
             else:
-                return None
+                return transceiver_dom_info_dict
 
             dom_channel_monitor_raw = self._read_eeprom_specific_bytes(sysfsfile_eeprom, (offset + SFP_CHANNL_MON_OFFSET), SFP_CHANNL_MON_WIDTH)
             if dom_channel_monitor_raw is not None:
                 dom_channel_monitor_data = sfpd_obj.parse_channel_monitor_params(dom_channel_monitor_raw, 0)
             else:
-                return None
+                return transceiver_dom_info_dict
 
             try:
                 sysfsfile_eeprom.close()
@@ -375,5 +387,3 @@ class SfpUtil(SfpUtilBase):
             transceiver_dom_info_dict['tx4power'] = 'N/A'
 
             return transceiver_dom_info_dict
-
-

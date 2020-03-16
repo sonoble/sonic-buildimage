@@ -154,8 +154,8 @@ static struct i2c_board_info i2c_device_info3[] __initdata = {
        {"tmp75",            0, 0x4E, 0, 0, 0},                 //Temp
 };
 static struct i2c_board_info i2c_device_info4[] __initdata = {
-       {"pmbus",            0, 0x5B, 0, 0, 0},                 //PSU1
-       {"pmbus",            0, 0x5A, 0, 0, 0},                 //PSU2
+       {"inv_psu",          0, 0x5B, 0, 0, 0},                 //PSU1
+       {"inv_psu",          0, 0x5A, 0, 0, 0},                 //PSU2
 };
 static struct i2c_board_info i2c_device_info5[] __initdata = {
         {"pca9548",          0, 0x70, &mux_data_0, 0, 0},       //mux root

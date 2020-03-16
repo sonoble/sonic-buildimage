@@ -115,6 +115,7 @@ instantiate = [
 
 drivers =[
 #kernel-dirvers
+'gpio_ich',
 'lpc_ich',
 'i2c-i801',
 'i2c-mux',
@@ -125,13 +126,15 @@ drivers =[
 #inv-modules
 'inv_eeprom',
 'inv_cpld',
+'lm75',
+'inv_psu',
 'inv_platform',
-#'monitor',
+'monitor',
 'swps']
 
 
-
-def system_install():
+# Modify for fast-reboot
+def system_install(boot_option):
     global FORCE
 
     #remove default drivers to avoid modprobe order conflicts
@@ -141,11 +144,19 @@ def system_install():
     status, output = exec_cmd("rmmod lpc_ich ", 1)
 
     #insert extra module
-    status, output = exec_cmd("insmod /lib/modules/4.9.0-9-2-amd64/kernel/drivers/gpio/gpio-ich.ko gpiobase=0",1)
+    #status, output = exec_cmd("insmod /lib/modules/4.9.0-9-2-amd64/kernel/drivers/gpio/gpio-ich.ko gpiobase=0",1)
 
     #install drivers
+    ''' boot_option: 0 - normal, 1 - fast-reboot'''
     for i in range(0,len(drivers)):
-       status, output = exec_cmd("modprobe "+drivers[i], 1)
+       if drivers[i] == "swps":
+           if boot_option == 1:
+               status, output = exec_cmd("modprobe swps io_no_init=1", 1)
+           else:
+               status, output = exec_cmd("modprobe "+drivers[i], 1)
+       else:
+           status, output = exec_cmd("modprobe "+drivers[i], 1)
+
     if status:
 	   print output
 	   if FORCE == 0:
@@ -214,10 +225,11 @@ def system_ready():
         return False
     return True
 
-def install():
+def install(boot_option=0):
+    ''' boot_option: 0 - normal, 1 - fast-reboot '''
     if not device_found():
         print "No device, installing...."
-        status = system_install()
+        status = system_install(boot_option)
         if status:
             if FORCE == 0:
                 return status
@@ -228,7 +240,6 @@ def install():
 def uninstall():
     global FORCE
     #uninstall drivers
-    exec_cmd("rmmod gpio_ich",1)
     for i in range(len(drivers)-1,-1,-1):
        status, output = exec_cmd("rmmod "+drivers[i], 1)
     if status:

@@ -1,7 +1,6 @@
 #include <linux/slab.h>
 #include <linux/i2c.h>
 #include "io_expander.h"
-
 /* For build single module using (Ex: ONL platform) */
 #include <linux/module.h>
 //#include <linux/inventec/d5254/io_expander.h>
@@ -1579,11 +1578,11 @@ common_ioexp_init(struct ioexp_obj_s *self) {
             }
             /* Setup default value */
             for (offset=0; offset<(self->ioexp_map_p->data_width); offset++){
-                
+
                 /* [Desc] Skip the setup default value behavior
                    [Note] Setup default value = -1 if you don't want to write the value to IOEXP or CPLD
                 */
-                if(addr_p->write_offset[offset] < 0){ 
+                if(addr_p->write_offset[offset] < 0){
                     SWPS_DEBUG("skip a write_offset <%d>\n", addr_p->conf_offset[offset]);
                     continue;
                 }
@@ -2170,7 +2169,7 @@ setup_ioexp_config(struct ioexp_obj_s *self) {
     int chip_id, offset, err_code;
     struct ioexp_addr_s *addr_p;
     if (io_no_init) {
-        
+
         SWPS_INFO("io_no_init:%d \n", io_no_init);
         return 0;
     }
@@ -2529,6 +2528,7 @@ _scan_channel_tier_1_single(void) {
     client->adapter = adap;
     client->addr = fake_addr;
     /* Fouce move ioexp ptr to next */
+    /*note this one will always fail so, dont need retry*/
     ret = i2c_smbus_read_byte_data(client, fake_offs);
     SWPS_DEBUG("%s: move ioexp_ptr done. <ret>:%d\n", __func__, ret);
     kfree(client);

@@ -24,9 +24,11 @@ class Fan(FanBase):
             self.__speed_rpm_attr = "/sys/class/hwmon/hwmon{}/fan{}_input".format((self.__psu_index + 6), self.__index)
             self.__pwm_attr       = None
         else:
-            self.__presence_attr  = "/sys/class/hwmon/hwmon2/device/fan{}_input".format(self.__index)
-            self.__speed_rpm_attr = "/sys/class/hwmon/hwmon2/device/fan{}_input".format(self.__index)
-            self.__pwm_attr       = "/sys/class/hwmon/hwmon2/device/pwm{}".format((self.__index + 1)/2)
+            self.__presence_attr        = "/sys/class/hwmon/hwmon2/device/fanmodule{}_type".format(self.__index)
+            self.__speed_front_rpm_attr = "/sys/class/hwmon/hwmon2/device/fan{}_input".format(self.__index*2-1)
+            self.__speed_rear_rpm_attr  = "/sys/class/hwmon/hwmon2/device/fan{}_input".format(self.__index*2)
+            self.__pwm_attr             = "/sys/class/hwmon/hwmon2/device/pwm{}".format(self.__index)
+            self.__led_attr             = "/sys/class/hwmon/hwmon2/device/fanmodule{}_led".format(self.__index)
 
     def __get_attr_value(self, attr_path):
 
@@ -71,7 +73,7 @@ class Fan(FanBase):
 
         attr_rv = self.__get_attr_value(attr_path)
         if (attr_rv != 'ERR'):
-            if (int(attr_rv) != 0):
+            if (attr_rv == "0:Normal Type" or attr_rv == "1:REVERSAL Type"):
                 presence = True
 
         return presence
@@ -101,7 +103,15 @@ class Fan(FanBase):
         Returns:
             A boolean value, True if device is operating properly, False if not
         """
-        return self.get_presence()
+        status = False
+        front_attr_path = self.__speed_front_rpm_attr
+        rear_attr_path = self.__speed_rear_rpm_attr
+        front_attr_rv = self.__get_attr_value(front_attr_path)
+        rear_attr_rv =  self.__get_attr_value(rear_attr_path)
+        if (front_attr_rv != 'ERR' and rear_attr_rv != 'ERR'):
+            if (int(front_attr_rv) != 0 and int(rear_attr_rv) != 0):
+                status = True
+        return status
 
 ##############################################
 # FAN methods
@@ -197,8 +207,14 @@ class Fan(FanBase):
         Returns:
             A string, one of the predefined STATUS_LED_COLOR_* strings above
         """
-        if self.get_status() and self.get_speed() > 0:
-            return self.STATUS_LED_COLOR_GREEN
-        else:
-            return self.STATUS_LED_COLOR_OFF
-
+        attr_path = self.__led_attr
+	attr_rv = self.__get_attr_value(attr_path)
+        if ( attr_rv != 'ERR'):
+            if ( attr_rv == "1:Green" ):
+                return self.STATUS_LED_COLOR_GREEN
+            elif ( attr_rv == "2:Red" ):
+                if self.get_presence is True:
+                    return self.STATUS_LED_COLOR_RED
+                else:
+                    return self.STATUS_LED_COLOR_OFF
+        return self.STATUS_LED_COLOR_OFF

@@ -10,14 +10,14 @@
 #define SWP_DEV_PORT          "port"
 #define SWP_DEV_MODCTL        "module"
 #define SWP_RESET_PWD         "inventec"
-#define SWP_POLLING_PERIOD    (300)  /* msec */
+#define SWP_POLLING_PERIOD    (100)  /* msec */
 #define SWP_POLLING_ENABLE    (1)
 #define SWP_AUTOCONFIG_ENABLE (1)
 
 /* Module information */
 #define SWP_AUTHOR            "Neil <liao.neil@inventec.com>"
 #define SWP_DESC              "Inventec port and transceiver driver"
-#define SWP_VERSION           "C1-4.3.5"
+#define SWP_VERSION           "4.3.7"
 #define SWP_LICENSE           "GPL"
 
 /* Module status define */

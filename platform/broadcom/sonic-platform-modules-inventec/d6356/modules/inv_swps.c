@@ -11,7 +11,7 @@
 #include <linux/dmi.h>
 #include <linux/i2c.h>
 #include "inv_swps.h"
-
+#include "sff_io.h"
 static int ctl_major;
 static int port_major;
 static int ioexp_total;
@@ -31,7 +31,11 @@ static void swp_polling_worker(struct work_struct *work);
 static DECLARE_DELAYED_WORK(swp_polling, swp_polling_worker);
 
 static int reset_i2c_topology(void);
-
+static int scan_100ms = 0;
+#define PROCESS_TIME (3)
+static int process_scan = 0;
+#define IOEXP_CHECK_TIME (10) /*100ms * PROCESS_TIME(3) * 1 = >~ 5s*/
+static int transvr_minor_curr = 0;
 
 static int
 __swp_match(struct device *dev,
@@ -449,7 +453,7 @@ store_attr_io_no_init( struct device *dev_p,
                        size_t count){
 
     int input_val = sscanf_2_int(buf_p);
-    
+
     if ((input_val != 0) && (input_val != 1)) {
         return -EBFONT;
     }
@@ -1161,7 +1165,355 @@ show_attr_auto_tx_disable(struct device *dev_p,
                                   buf_p);
 }
 
+static ssize_t
+show_attr_eeprom(struct device *dev_p,
+                          struct device_attribute *attr_p,
+                          char *buf_p){
 
+    struct transvr_obj_s *tobj_p = dev_get_drvdata(dev_p);
+    if(!tobj_p){
+        return -ENODEV;
+    }
+    return _show_transvr_str_attr(tobj_p,
+                                  tobj_p->get_eeprom,
+                                  buf_p);
+}
+
+static ssize_t
+show_attr_eeprom_a0(struct device *dev_p,
+                          struct device_attribute *attr_p,
+                          char *buf_p){
+
+    struct transvr_obj_s *tobj_p = dev_get_drvdata(dev_p);
+    if(!tobj_p){
+        return -ENODEV;
+    }
+    return _show_transvr_str_attr(tobj_p,
+                                  tobj_p->get_eeprom_a0,
+                                  buf_p);
+}
+
+static ssize_t
+show_attr_eeprom_a2(struct device *dev_p,
+                          struct device_attribute *attr_p,
+                          char *buf_p){
+
+    struct transvr_obj_s *tobj_p = dev_get_drvdata(dev_p);
+    if(!tobj_p){
+        return -ENODEV;
+    }
+    return _show_transvr_str_attr(tobj_p,
+                                  tobj_p->get_eeprom_a2,
+                                  buf_p);
+}
+
+static ssize_t
+show_attr_eeprom_page03(struct device *dev_p,
+                          struct device_attribute *attr_p,
+                          char *buf_p){
+
+    struct transvr_obj_s *tobj_p = dev_get_drvdata(dev_p);
+    if(!tobj_p){
+        return -ENODEV;
+    }
+    return _show_transvr_str_attr(tobj_p,
+                                  tobj_p->get_eeprom_page03,
+                                  buf_p);
+}
+
+static ssize_t
+show_attr_temp_high_alarm(struct device *dev_p,
+                          struct device_attribute *attr_p,
+                          char *buf_p){
+
+    struct transvr_obj_s *tobj_p = dev_get_drvdata(dev_p);
+    if(!tobj_p){
+        return -ENODEV;
+    }
+    return _show_transvr_str_attr(tobj_p,
+                                  tobj_p->get_temp_high_alarm,
+                                  buf_p);
+}
+
+static ssize_t
+show_attr_temp_low_alarm(struct device *dev_p,
+                          struct device_attribute *attr_p,
+                          char *buf_p){
+
+    struct transvr_obj_s *tobj_p = dev_get_drvdata(dev_p);
+    if(!tobj_p){
+        return -ENODEV;
+    }
+    return _show_transvr_str_attr(tobj_p,
+                                  tobj_p->get_temp_low_alarm,
+                                  buf_p);
+}
+
+static ssize_t
+show_attr_voltage_high_alarm(struct device *dev_p,
+                          struct device_attribute *attr_p,
+                          char *buf_p){
+
+    struct transvr_obj_s *tobj_p = dev_get_drvdata(dev_p);
+    if(!tobj_p){
+        return -ENODEV;
+    }
+    return _show_transvr_str_attr(tobj_p,
+                                  tobj_p->get_voltage_high_alarm,
+                                  buf_p);
+}
+
+static ssize_t
+show_attr_voltage_low_alarm(struct device *dev_p,
+                          struct device_attribute *attr_p,
+                          char *buf_p){
+
+    struct transvr_obj_s *tobj_p = dev_get_drvdata(dev_p);
+    if(!tobj_p){
+        return -ENODEV;
+    }
+    return _show_transvr_str_attr(tobj_p,
+                                  tobj_p->get_voltage_low_alarm,
+                                  buf_p);
+}
+
+static ssize_t
+show_attr_bias_high_alarm(struct device *dev_p,
+                          struct device_attribute *attr_p,
+                          char *buf_p){
+
+    struct transvr_obj_s *tobj_p = dev_get_drvdata(dev_p);
+    if(!tobj_p){
+        return -ENODEV;
+    }
+    return _show_transvr_str_attr(tobj_p,
+                                  tobj_p->get_bias_high_alarm,
+                                  buf_p);
+}
+
+static ssize_t
+show_attr_bias_low_alarm(struct device *dev_p,
+                          struct device_attribute *attr_p,
+                          char *buf_p){
+
+    struct transvr_obj_s *tobj_p = dev_get_drvdata(dev_p);
+    if(!tobj_p){
+        return -ENODEV;
+    }
+    return _show_transvr_str_attr(tobj_p,
+                                  tobj_p->get_bias_low_alarm,
+                                  buf_p);
+}
+
+static ssize_t
+show_attr_rx_power_high_alarm(struct device *dev_p,
+                          struct device_attribute *attr_p,
+                          char *buf_p){
+
+    struct transvr_obj_s *tobj_p = dev_get_drvdata(dev_p);
+    if(!tobj_p){
+        return -ENODEV;
+    }
+    return _show_transvr_str_attr(tobj_p,
+                                  tobj_p->get_rx_power_high_alarm,
+                                  buf_p);
+}
+
+static ssize_t
+show_attr_rx_power_low_alarm(struct device *dev_p,
+                          struct device_attribute *attr_p,
+                          char *buf_p){
+
+    struct transvr_obj_s *tobj_p = dev_get_drvdata(dev_p);
+    if(!tobj_p){
+        return -ENODEV;
+    }
+    return _show_transvr_str_attr(tobj_p,
+                                  tobj_p->get_rx_power_low_alarm,
+                                  buf_p);
+}
+
+static ssize_t
+show_attr_tx_power_high_alarm(struct device *dev_p,
+                          struct device_attribute *attr_p,
+                          char *buf_p){
+
+    struct transvr_obj_s *tobj_p = dev_get_drvdata(dev_p);
+    if(!tobj_p){
+        return -ENODEV;
+    }
+    return _show_transvr_str_attr(tobj_p,
+                                  tobj_p->get_tx_power_high_alarm,
+                                  buf_p);
+}
+
+static ssize_t
+show_attr_tx_power_low_alarm(struct device *dev_p,
+                          struct device_attribute *attr_p,
+                          char *buf_p){
+
+    struct transvr_obj_s *tobj_p = dev_get_drvdata(dev_p);
+    if(!tobj_p){
+        return -ENODEV;
+    }
+    return _show_transvr_str_attr(tobj_p,
+                                  tobj_p->get_tx_power_low_alarm,
+                                  buf_p);
+}
+
+static ssize_t
+show_attr_temp_high_alarm_threshold(struct device *dev_p,
+                          struct device_attribute *attr_p,
+                          char *buf_p){
+
+    struct transvr_obj_s *tobj_p = dev_get_drvdata(dev_p);
+    if(!tobj_p){
+        return -ENODEV;
+    }
+    return _show_transvr_str_attr(tobj_p,
+                                  tobj_p->get_temp_high_alarm_threshold,
+                                  buf_p);
+}
+
+static ssize_t
+show_attr_temp_low_alarm_threshold(struct device *dev_p,
+                          struct device_attribute *attr_p,
+                          char *buf_p){
+
+    struct transvr_obj_s *tobj_p = dev_get_drvdata(dev_p);
+    if(!tobj_p){
+        return -ENODEV;
+    }
+    return _show_transvr_str_attr(tobj_p,
+                                  tobj_p->get_temp_low_alarm_threshold,
+                                  buf_p);
+}
+
+static ssize_t
+show_attr_voltage_high_alarm_threshold(struct device *dev_p,
+                          struct device_attribute *attr_p,
+                          char *buf_p){
+
+    struct transvr_obj_s *tobj_p = dev_get_drvdata(dev_p);
+    if(!tobj_p){
+        return -ENODEV;
+    }
+    return _show_transvr_str_attr(tobj_p,
+                                  tobj_p->get_voltage_high_alarm_threshold,
+                                  buf_p);
+}
+
+static ssize_t
+show_attr_voltage_low_alarm_threshold(struct device *dev_p,
+                          struct device_attribute *attr_p,
+                          char *buf_p){
+
+    struct transvr_obj_s *tobj_p = dev_get_drvdata(dev_p);
+    if(!tobj_p){
+        return -ENODEV;
+    }
+    return _show_transvr_str_attr(tobj_p,
+                                  tobj_p->get_voltage_low_alarm_threshold,
+                                  buf_p);
+}
+
+static ssize_t
+show_attr_bias_high_alarm_threshold(struct device *dev_p,
+                          struct device_attribute *attr_p,
+                          char *buf_p){
+
+    struct transvr_obj_s *tobj_p = dev_get_drvdata(dev_p);
+    if(!tobj_p){
+        return -ENODEV;
+    }
+    return _show_transvr_str_attr(tobj_p,
+                                  tobj_p->get_bias_high_alarm_threshold,
+                                  buf_p);
+}
+
+static ssize_t
+show_attr_bias_low_alarm_threshold(struct device *dev_p,
+                          struct device_attribute *attr_p,
+                          char *buf_p){
+
+    struct transvr_obj_s *tobj_p = dev_get_drvdata(dev_p);
+    if(!tobj_p){
+        return -ENODEV;
+    }
+    return _show_transvr_str_attr(tobj_p,
+                                  tobj_p->get_bias_low_alarm_threshold,
+                                  buf_p);
+}
+
+static ssize_t
+show_attr_rx_power_high_alarm_threshold(struct device *dev_p,
+                          struct device_attribute *attr_p,
+                          char *buf_p){
+
+    struct transvr_obj_s *tobj_p = dev_get_drvdata(dev_p);
+    if(!tobj_p){
+        return -ENODEV;
+    }
+    return _show_transvr_str_attr(tobj_p,
+                                  tobj_p->get_rx_power_high_alarm_threshold,
+                                  buf_p);
+}
+
+static ssize_t
+show_attr_rx_power_low_alarm_threshold(struct device *dev_p,
+                          struct device_attribute *attr_p,
+                          char *buf_p){
+
+    struct transvr_obj_s *tobj_p = dev_get_drvdata(dev_p);
+    if(!tobj_p){
+        return -ENODEV;
+    }
+    return _show_transvr_str_attr(tobj_p,
+                                  tobj_p->get_rx_power_low_alarm_threshold,
+                                  buf_p);
+}
+
+static ssize_t
+show_attr_tx_power_high_alarm_threshold(struct device *dev_p,
+                          struct device_attribute *attr_p,
+                          char *buf_p){
+
+    struct transvr_obj_s *tobj_p = dev_get_drvdata(dev_p);
+    if(!tobj_p){
+        return -ENODEV;
+    }
+    return _show_transvr_str_attr(tobj_p,
+                                  tobj_p->get_tx_power_high_alarm_threshold,
+                                  buf_p);
+}
+
+static ssize_t
+show_attr_tx_power_low_alarm_threshold(struct device *dev_p,
+                          struct device_attribute *attr_p,
+                          char *buf_p){
+
+    struct transvr_obj_s *tobj_p = dev_get_drvdata(dev_p);
+    if(!tobj_p){
+        return -ENODEV;
+    }
+    return _show_transvr_str_attr(tobj_p,
+                                  tobj_p->get_tx_power_low_alarm_threshold,
+                                  buf_p);
+}
+
+static ssize_t
+show_attr_manufacturing_date(struct device *dev_p,
+                   struct device_attribute *attr_p,
+                   char *buf_p){
+
+    struct transvr_obj_s *tobj_p = dev_get_drvdata(dev_p);
+    if(!tobj_p){
+        return -ENODEV;
+    }
+    return _show_transvr_str_attr(tobj_p,
+                                  tobj_p->get_manufacturing_date,
+                                  buf_p);
+}
 /* ========== Store functions: transceiver (R/W) attribute ==========
  */
 static ssize_t
@@ -1436,12 +1788,19 @@ show_attr_present(struct device *dev_p,
                   char *buf_p){
 
     struct transvr_obj_s *tobj_p = dev_get_drvdata(dev_p);
+    int data = 0;
+    size_t len;
     if (!tobj_p){
         return -ENODEV;
     }
+    data = present_st_get(tobj_p->port_id);
+    len = snprintf(buf_p, PAGE_SIZE, "%d\n", data);
+    return len;
+#if 0
     return _show_ioexp_binary_attr(tobj_p,
                                    tobj_p->ioexp_obj_p->get_present,
                                    buf_p);
+#endif
 }
 
 
@@ -1451,12 +1810,20 @@ show_attr_tx_fault(struct device *dev_p,
                    char *buf_p){
 
     struct transvr_obj_s *tobj_p = dev_get_drvdata(dev_p);
+    int data = 0;
+    int len;
     if (!tobj_p){
         return -ENODEV;
     }
+
+    data = txfault_get(tobj_p->port_id);
+    len = snprintf(buf_p, PAGE_SIZE, "%d\n", data);
+    return len;
+#if 0
     return _show_ioexp_binary_attr(tobj_p,
                                    tobj_p->ioexp_obj_p->get_tx_fault,
-                                   buf_p);
+                              buf_p);
+#endif
 }
 
 
@@ -1466,12 +1833,20 @@ show_attr_rxlos(struct device *dev_p,
                 char *buf_p){
 
     struct transvr_obj_s *tobj_p = dev_get_drvdata(dev_p);
+    int data = 0;
+    int len;
     if (!tobj_p){
         return -ENODEV;
     }
+
+    data = rxlos_get(tobj_p->port_id);
+    len = snprintf(buf_p, PAGE_SIZE, "%d\n", data);
+    return len;
+#if 0
     return _show_ioexp_binary_attr(tobj_p,
                                    tobj_p->ioexp_obj_p->get_rxlos,
                                    buf_p);
+#endif
 }
 
 
@@ -1734,16 +2109,42 @@ static DEVICE_ATTR(comp_extend,     S_IRUGO,         show_attr_comp_extend,     
 static DEVICE_ATTR(rate_id,         S_IRUGO,         show_attr_rate_id,         NULL);
 static DEVICE_ATTR(temperature,     S_IRUGO,         show_attr_temperature,     NULL);
 static DEVICE_ATTR(voltage,         S_IRUGO,         show_attr_voltage,         NULL);
-static DEVICE_ATTR(tx_bias,         S_IRUGO,         show_attr_tx_bias,         NULL);
+static DEVICE_ATTR(bias,            S_IRUGO,         show_attr_tx_bias,         NULL);
 static DEVICE_ATTR(tx_power,        S_IRUGO,         show_attr_tx_power,        NULL);
 static DEVICE_ATTR(rx_power,        S_IRUGO,         show_attr_rx_power,        NULL);
 static DEVICE_ATTR(info,            S_IRUGO,         show_attr_info,            NULL);
 static DEVICE_ATTR(if_type,         S_IRUGO,         show_attr_if_type,         NULL);
 static DEVICE_ATTR(if_speed,        S_IRUGO,         show_attr_if_speed,        NULL);
 static DEVICE_ATTR(if_lane,         S_IRUGO,         show_attr_if_lane,         NULL);
-static DEVICE_ATTR(soft_rx_los,     S_IRUGO,         show_attr_soft_rx_los,     NULL);
 static DEVICE_ATTR(soft_tx_fault,   S_IRUGO,         show_attr_soft_tx_fault,   NULL);
 static DEVICE_ATTR(wavelength,      S_IRUGO,         show_attr_wavelength,      NULL);
+static DEVICE_ATTR(eeprom,          S_IRUGO,         show_attr_eeprom,          NULL);
+static DEVICE_ATTR(A0,              S_IRUGO,         show_attr_eeprom_a0,       NULL);
+static DEVICE_ATTR(A2,              S_IRUGO,         show_attr_eeprom_a2,       NULL);
+static DEVICE_ATTR(Page00,          S_IRUGO,         show_attr_eeprom,          NULL);
+static DEVICE_ATTR(Page03,          S_IRUGO,         show_attr_eeprom_page03,   NULL);
+static DEVICE_ATTR(soft_rx_los_signal,                  S_IRUGO,        show_attr_soft_rx_los,                      NULL);
+static DEVICE_ATTR(temperature_high_alarm,              S_IRUGO,        show_attr_temp_high_alarm,                  NULL);
+static DEVICE_ATTR(temperature_low_alarm,               S_IRUGO,        show_attr_temp_low_alarm,                   NULL);
+static DEVICE_ATTR(voltage_high_alarm,                  S_IRUGO,        show_attr_voltage_high_alarm,               NULL);
+static DEVICE_ATTR(voltage_low_alarm,                   S_IRUGO,        show_attr_voltage_low_alarm,                NULL);
+static DEVICE_ATTR(bias_high_alarm,                     S_IRUGO,        show_attr_bias_high_alarm,                  NULL);
+static DEVICE_ATTR(bias_low_alarm,                      S_IRUGO,        show_attr_bias_low_alarm,                   NULL);
+static DEVICE_ATTR(rx_power_high_alarm,                 S_IRUGO,        show_attr_rx_power_high_alarm,              NULL);
+static DEVICE_ATTR(rx_power_low_alarm,                  S_IRUGO,        show_attr_rx_power_low_alarm,               NULL);
+static DEVICE_ATTR(tx_power_high_alarm,                 S_IRUGO,        show_attr_tx_power_high_alarm,              NULL);
+static DEVICE_ATTR(tx_power_low_alarm,                  S_IRUGO,        show_attr_tx_power_low_alarm,               NULL);
+static DEVICE_ATTR(temperature_high_threshold,          S_IRUGO,        show_attr_temp_high_alarm_threshold,        NULL);
+static DEVICE_ATTR(temperature_low_threshold,           S_IRUGO,        show_attr_temp_low_alarm_threshold,         NULL);
+static DEVICE_ATTR(voltage_high_threshold,              S_IRUGO,        show_attr_voltage_high_alarm_threshold,     NULL);
+static DEVICE_ATTR(voltage_low_threshold,               S_IRUGO,        show_attr_voltage_low_alarm_threshold,      NULL);
+static DEVICE_ATTR(bias_high_threshold,                 S_IRUGO,        show_attr_bias_high_alarm_threshold,        NULL);
+static DEVICE_ATTR(bias_low_threshold,                  S_IRUGO,        show_attr_bias_low_alarm_threshold,         NULL);
+static DEVICE_ATTR(rx_power_high_threshold,             S_IRUGO,        show_attr_rx_power_high_alarm_threshold,    NULL);
+static DEVICE_ATTR(rx_power_low_threshold,              S_IRUGO,        show_attr_rx_power_low_alarm_threshold,     NULL);
+static DEVICE_ATTR(tx_power_high_threshold,             S_IRUGO,        show_attr_tx_power_high_alarm_threshold,    NULL);
+static DEVICE_ATTR(tx_power_low_threshold,              S_IRUGO,        show_attr_tx_power_low_alarm_threshold,     NULL);
+static DEVICE_ATTR(manufacturing_date,                  S_IRUGO,        show_attr_manufacturing_date,               NULL);
 static DEVICE_ATTR(tx_eq,           S_IRUGO|S_IWUSR, show_attr_tx_eq,           store_attr_tx_eq);
 static DEVICE_ATTR(rx_am,           S_IRUGO|S_IWUSR, show_attr_rx_am,           store_attr_rx_am);
 static DEVICE_ATTR(rx_em,           S_IRUGO|S_IWUSR, show_attr_rx_em,           store_attr_rx_em);
@@ -1758,8 +2159,8 @@ static DEVICE_ATTR(extphy_reg,      S_IRUGO|S_IWUSR, show_attr_extphy_reg,      
 /* ========== IO Expander attribute: from expander ==========
  */
 static DEVICE_ATTR(present,         S_IRUGO,         show_attr_present,         NULL);
-static DEVICE_ATTR(tx_fault,        S_IRUGO,         show_attr_tx_fault,        NULL);
-static DEVICE_ATTR(rxlos,           S_IRUGO,         show_attr_rxlos,           NULL);
+static DEVICE_ATTR(hard_tx_fault,   S_IRUGO,         show_attr_tx_fault,        NULL);
+static DEVICE_ATTR(hard_rx_loss_signal,  S_IRUGO,    show_attr_rxlos,           NULL);
 static DEVICE_ATTR(tx_disable,      S_IRUGO|S_IWUSR, show_attr_tx_disable,      store_attr_tx_disable);
 static DEVICE_ATTR(reset,           S_IRUGO|S_IWUSR, show_attr_reset,           store_attr_reset);
 static DEVICE_ATTR(lpmod,           S_IRUGO|S_IWUSR, show_attr_lpmod,           store_attr_lpmod);
@@ -2282,7 +2683,46 @@ err_reset_i2c_topology_1:
     SWPS_INFO("%s: %s <minor>:%d\n", __func__, emsg, minor_err);
     return -1;
 }
+static int
+transvr_obj_health_mtr(char *dev_name)
+{
 
+    struct transvr_obj_s *tobj_p = NULL;
+    int retval = -9;
+
+    tobj_p = _get_transvr_obj(dev_name);
+    if (!tobj_p) {
+        SWPS_ERR("%s: %s _get_transvr_obj fail\n",
+                __func__, dev_name);
+        return -9;
+    }
+    /* Check transceiver current status */
+    lock_transvr_obj(tobj_p);
+    retval = transvr_health_mtr(tobj_p);
+    unlock_transvr_obj(tobj_p);
+    switch (retval) {
+        case 0:
+        case ERR_TRANSVR_UNPLUGGED:
+        case ERR_TRNASVR_BE_ISOLATED:
+        case ERR_TRANSVR_TASK_BUSY:
+            return 0;
+
+        case ERR_TRANSVR_I2C_CRASH:
+        default:
+            break;
+    }
+    /* Identify abnormal case */
+    if (check_channel_tier_1() < 0) {
+        SWPS_DEBUG("%s: %s critical error <err>:%d\n",
+                   __func__, dev_name, retval);
+        return -2;
+    }
+    SWPS_DEBUG("%s: %s single error <err>:%d\n",
+               __func__, dev_name, retval);
+    return -1;
+
+
+}
 
 static int
 check_transvr_obj_one(char *dev_name){
@@ -2326,7 +2766,57 @@ check_transvr_obj_one(char *dev_name){
                __func__, dev_name, retval);
     return -1;
 }
+static int
+transvr_objs_health_mtr(void)
+{
+    char dev_name[32];
+    int port_id, err_code;
+//    int minor_curr = 0;
 
+    //for (minor_curr=0; minor_curr<port_total; minor_curr++) {
+    if (port_total == transvr_minor_curr)
+    {
+        transvr_minor_curr = 0;
+    }
+    /* Generate device name */
+    port_id = port_layout[transvr_minor_curr].port_id;
+    transvr_minor_curr++;
+    memset(dev_name, 0, sizeof(dev_name));
+    snprintf(dev_name, sizeof(dev_name), "%s%d", SWP_DEV_PORT, port_id);
+    /* Handle current status */
+    err_code = transvr_obj_health_mtr(dev_name);
+    switch (err_code) {
+        case  0:
+        case -1:
+            break;
+
+        case -2:
+            SWPS_DEBUG("%s: %s reset I2C GO.\n",
+                       __func__, dev_name);
+            if (reset_i2c_topology() < 0) {
+                goto err_check_transvr_objs;
+            }
+            SWPS_DEBUG("%s: %s reset I2C OK.\n",
+                       __func__, dev_name);
+            break;
+
+        case -9:
+        default:
+            SWPS_DEBUG("%s: %s internal error <err>:%d\n",
+                    __func__, dev_name, err_code);
+            break;
+    }
+    //}
+    return 0;
+
+err_check_transvr_objs:
+    SWPS_ERR("%s: %s reset_i2c_topology fail.\n",
+               __func__, dev_name);
+    return -1;
+
+
+
+}
 
 static int
 check_transvr_objs(void){
@@ -2376,18 +2866,38 @@ err_check_transvr_objs:
 static void
 swp_polling_worker(struct work_struct *work){
 
-    /* Reset I2C */
-    if (flag_i2c_reset) {
+    if (io_exp_isr_handler() < 0) {
         goto polling_reset_i2c;
     }
+    /* Reset I2C */
+#if 0
     /* Check IOEXP */
     if (check_ioexp_objs() < 0) {
         goto polling_reset_i2c;
     }
-    /* Check transceiver */
-    if (check_transvr_objs() < 0) {
-        SWPS_DEBUG("%s: check_transvr_objs fail.\n", __func__);
-        flag_i2c_reset = 1;
+#endif
+    if (scan_100ms++ > PROCESS_TIME) {
+        scan_100ms = 0;
+        process_scan++;
+        /* Check transceiver */
+        if (check_transvr_objs() < 0) {
+            SWPS_DEBUG("%s: check_transvr_objs fail.\n", __func__);
+            flag_i2c_reset = 1;
+        }
+        if (transvr_objs_health_mtr() < 0) {
+             SWPS_DEBUG("%s: transvr_objs health fail.\n", __func__);
+             flag_i2c_reset = 1;
+
+        }
+    }
+    if (process_scan > IOEXP_CHECK_TIME) {
+        process_scan = 0;
+        if (io_exps_check() < 0) {
+            goto polling_reset_i2c;
+        }
+    }
+    if (flag_i2c_reset) {
+        goto polling_reset_i2c;
     }
     goto polling_schedule_round;
 
@@ -2427,6 +2937,10 @@ register_transvr_common_attr(struct device *device_p){
     if (device_create_file(device_p, &dev_attr_vendor_name) < 0) {
         err_attr = "dev_attr_vendor_name";
          goto err_transvr_comm_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_eeprom) < 0) {
+        err_attr = "dev_attr_eeprom";
+        goto err_transvr_comm_attr;
     }
     if (device_create_file(device_p, &dev_attr_vendor_pn) < 0) {
         err_attr = "dev_attr_vendor_pn";
@@ -2500,8 +3014,8 @@ register_transvr_common_attr(struct device *device_p){
         err_attr = "dev_attr_voltage";
         goto err_transvr_comm_attr;
     }
-    if (device_create_file(device_p, &dev_attr_tx_bias) < 0) {
-        err_attr = "dev_attr_tx_bias";
+    if (device_create_file(device_p, &dev_attr_bias) < 0) {
+        err_attr = "dev_attr_bias";
         goto err_transvr_comm_attr;
     }
     if (device_create_file(device_p, &dev_attr_tx_power) < 0) {
@@ -2522,6 +3036,10 @@ register_transvr_common_attr(struct device *device_p){
     }
     if (device_create_file(device_p, &dev_attr_wavelength) < 0) {
         err_attr = "dev_attr_wavelength";
+        goto err_transvr_comm_attr;
+    }
+	if (device_create_file(device_p, &dev_attr_manufacturing_date) < 0) {
+        err_attr = "dev_attr_manufacturing_date";
         goto err_transvr_comm_attr;
     }
     return 0;
@@ -2568,6 +3086,94 @@ register_transvr_sfp_attr(struct device *device_p){
         err_attr = "dev_attr_extphy_reg";
         goto err_transvr_sfp_attr;
     }
+    if (device_create_file(device_p, &dev_attr_A0) < 0) {
+        err_attr = "dev_attr_A0";
+        goto err_transvr_sfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_A2) < 0) {
+        err_attr = "dev_attr_A2";
+        goto err_transvr_sfp_attr;
+    }
+	if (device_create_file(device_p, &dev_attr_temperature_high_alarm) < 0) {
+        err_attr = "dev_attr_temperature_high_alarm";
+        goto err_transvr_sfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_temperature_low_alarm) < 0) {
+        err_attr = "dev_attr_temperature_low_alarm";
+        goto err_transvr_sfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_voltage_high_alarm) < 0) {
+        err_attr = "dev_attr_voltage_high_alarm";
+        goto err_transvr_sfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_voltage_low_alarm) < 0) {
+        err_attr = "dev_attr_voltage_low_alarm";
+        goto err_transvr_sfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_bias_high_alarm) < 0) {
+        err_attr = "dev_attr_bias_high_alarm";
+        goto err_transvr_sfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_bias_low_alarm) < 0) {
+        err_attr = "dev_attr_bias_low_alarm";
+        goto err_transvr_sfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_rx_power_high_alarm) < 0) {
+        err_attr = "dev_attr_rx_power_high_alarm";
+        goto err_transvr_sfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_rx_power_low_alarm) < 0) {
+        err_attr = "dev_attr_rx_power_low_alarm";
+        goto err_transvr_sfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_tx_power_high_alarm) < 0) {
+        err_attr = "dev_attr_tx_power_high_alarm";
+        goto err_transvr_sfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_tx_power_low_alarm) < 0) {
+        err_attr = "dev_attr_tx_power_low_alarm";
+        goto err_transvr_sfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_temperature_high_threshold) < 0) {
+        err_attr = "dev_attr_temperature_high_threshold";
+        goto err_transvr_sfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_temperature_low_threshold) < 0) {
+        err_attr = "dev_attr_temperature_low_threshold";
+        goto err_transvr_sfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_voltage_high_threshold) < 0) {
+        err_attr = "dev_attr_voltage_high_hreshold";
+        goto err_transvr_sfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_voltage_low_threshold) < 0) {
+        err_attr = "dev_attr_voltage_low_threshold";
+        goto err_transvr_sfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_bias_high_threshold) < 0) {
+        err_attr = "dev_attr_bias_high_threshold";
+        goto err_transvr_sfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_bias_low_threshold) < 0) {
+        err_attr = "dev_attr_bias_low_threshold";
+        goto err_transvr_sfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_rx_power_high_threshold) < 0) {
+        err_attr = "dev_attr_rx_power_high_threshold";
+        goto err_transvr_sfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_rx_power_low_threshold) < 0) {
+        err_attr = "dev_attr_rx_power_low_threshold";
+        goto err_transvr_sfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_tx_power_high_threshold) < 0) {
+        err_attr = "dev_attr_tx_power_high_threshold";
+        goto err_transvr_sfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_tx_power_low_threshold) < 0) {
+        err_attr = "dev_attr_tx_power_low_threshold";
+        goto err_transvr_sfp_attr;
+    }
     return 0;
 
 err_transvr_sfp_attr:
@@ -2593,8 +3199,8 @@ register_transvr_qsfp_attr(struct device *device_p){
         err_attr = "dev_attr_power_cls";
         goto err_transvr_qsfp_attr;
     }
-    if (device_create_file(device_p, &dev_attr_soft_rx_los) < 0) {
-        err_attr = "soft_rx_los";
+    if (device_create_file(device_p, &dev_attr_soft_rx_los_signal) < 0) {
+        err_attr = "soft_rx_los_signal";
         goto err_transvr_qsfp_attr;
     }
     if (device_create_file(device_p, &dev_attr_soft_tx_disable) < 0) {
@@ -2607,6 +3213,94 @@ register_transvr_qsfp_attr(struct device *device_p){
     }
     if (device_create_file(device_p, &dev_attr_soft_tx_fault) < 0) {
         err_attr = "soft_tx_fault";
+        goto err_transvr_qsfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_Page00) < 0) {
+        err_attr = "dev_attr_Page00";
+        goto err_transvr_qsfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_Page03) < 0) {
+        err_attr = "dev_attr_Page03";
+        goto err_transvr_qsfp_attr;
+    }
+	if (device_create_file(device_p, &dev_attr_temperature_high_alarm) < 0) {
+        err_attr = "dev_attr_temperature_high_alarm";
+        goto err_transvr_qsfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_temperature_low_alarm) < 0) {
+        err_attr = "dev_attr_temperature_low_alarm";
+        goto err_transvr_qsfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_voltage_high_alarm) < 0) {
+        err_attr = "dev_attr_voltage_high_alarm";
+        goto err_transvr_qsfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_voltage_low_alarm) < 0) {
+        err_attr = "dev_attr_voltage_low_alarm";
+        goto err_transvr_qsfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_bias_high_alarm) < 0) {
+        err_attr = "dev_attr_bias_high_alarm";
+        goto err_transvr_qsfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_bias_low_alarm) < 0) {
+        err_attr = "dev_attr_bias_low_alarm";
+        goto err_transvr_qsfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_rx_power_high_alarm) < 0) {
+        err_attr = "dev_attr_rx_power_high_alarm";
+        goto err_transvr_qsfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_rx_power_low_alarm) < 0) {
+        err_attr = "dev_attr_rx_power_low_alarm";
+        goto err_transvr_qsfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_tx_power_high_alarm) < 0) {
+        err_attr = "dev_attr_tx_power_high_alarm";
+        goto err_transvr_qsfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_tx_power_low_alarm) < 0) {
+        err_attr = "dev_attr_tx_power_low_alarm";
+        goto err_transvr_qsfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_temperature_high_threshold) < 0) {
+        err_attr = "dev_attr_temperature_high_threshold";
+        goto err_transvr_qsfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_temperature_low_threshold) < 0) {
+        err_attr = "dev_attr_temperature_low_threshold";
+        goto err_transvr_qsfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_voltage_high_threshold) < 0) {
+        err_attr = "dev_attr_voltage_high_threshold";
+        goto err_transvr_qsfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_voltage_low_threshold) < 0) {
+        err_attr = "dev_attr_voltage_low_threshold";
+        goto err_transvr_qsfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_bias_high_threshold) < 0) {
+        err_attr = "dev_attr_bias_high_threshold";
+        goto err_transvr_qsfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_bias_low_threshold) < 0) {
+        err_attr = "dev_attr_bias_low_threshold";
+        goto err_transvr_qsfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_rx_power_high_threshold) < 0) {
+        err_attr = "dev_attr_rx_power_high_threshold";
+        goto err_transvr_qsfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_rx_power_low_threshold) < 0) {
+        err_attr = "dev_attr_rx_power_low_threshold";
+        goto err_transvr_qsfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_tx_power_high_threshold) < 0) {
+        err_attr = "dev_attr_tx_power_high_threshold";
+        goto err_transvr_qsfp_attr;
+    }
+    if (device_create_file(device_p, &dev_attr_tx_power_low_threshold) < 0) {
+        err_attr = "dev_attr_tx_power_low_threshold";
         goto err_transvr_qsfp_attr;
     }
     return 0;
@@ -2685,12 +3379,12 @@ register_ioexp_attr_sfp_1(struct device *device_p){
            err_attr = "dev_attr_present";
         goto err_ioexp_sfp1_attr;
     }
-    if (device_create_file(device_p, &dev_attr_tx_fault) < 0) {
-        err_attr = "dev_attr_tx_fault";
+    if (device_create_file(device_p, &dev_attr_hard_tx_fault) < 0) {
+        err_attr = "dev_attr_hard_tx_fault";
         goto err_ioexp_sfp1_attr;
     }
-    if (device_create_file(device_p, &dev_attr_rxlos) < 0) {
-        err_attr = "dev_attr_rxlos";
+    if (device_create_file(device_p, &dev_attr_hard_rx_loss_signal) < 0) {
+        err_attr = "dev_attr_hard_rx_loss_signal";
         goto err_ioexp_sfp1_attr;
     }
     if (device_create_file(device_p, &dev_attr_tx_disable) < 0) {
@@ -2940,7 +3634,6 @@ register_swp_module(void){
 
     dev_t ctl_devt  = 0;
     dev_t port_devt = 0;
-    int dev_total = port_total + 1; /* char_dev for module control */
 
     /* Register device number */
     if (alloc_chrdev_region(&ctl_devt, 0, 1, SWP_DEV_MODCTL) < 0){
@@ -3046,7 +3739,7 @@ create_port_objs(void) {
         }
         transvr_obj_p = create_transvr_obj(dev_name, chan_id, ioexp_obj_p,
                                            ioexp_virt_offset, transvr_type,
-                                           chipset_type, run_mod);
+                                           chipset_type, run_mod, port_id);
         if (!transvr_obj_p){
             snprintf(err_msg, sizeof(err_msg),
                     "Create transceiver object fail <id>:%s", dev_name);
@@ -3186,6 +3879,10 @@ err_init_swps_common_1:
 static int __init
 swp_module_init(void){
 
+    if (sff_io_init() < 0) {
+
+        goto err_init_out;
+    }
     if (get_platform_type() < 0){
         goto err_init_out;
     }
@@ -3208,6 +3905,9 @@ swp_module_init(void){
         goto err_init_topology;
     }
     if (init_swps_common() < 0){
+        goto err_init_topology;
+    }
+    if (cpld_ioexp_isr_enable() < 0) {
         goto err_init_topology;
     }
     SWPS_INFO("Inventec switch-port module V.%s initial success.\n", SWP_VERSION);
@@ -3237,6 +3937,9 @@ swp_module_exit(void){
     clean_port_objs();
     clean_ioexp_objs();
     clean_mux_objs();
+#if 1
+    sff_io_deinit();
+#endif
     class_destroy(swp_class_p);
     unregister_chrdev_region(MKDEV(ctl_major, 0), 1);
     unregister_chrdev_region(MKDEV(port_major, 0), port_total);

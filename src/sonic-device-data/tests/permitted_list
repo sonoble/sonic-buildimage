@@ -1,3 +1,6 @@
+pdma_dv_free_count
+pdma_dv_free_size
+serdes_preemphasis_10g
 arl_clean_timeout_usec
 asf_mem_profile
 bcm_linkscan_interval
@@ -209,3 +212,4 @@ sai_preinit_cmd_file
 sai_preinit_warmboot_cmd_file
 sai_postinit_cmd_file
 sai_postinit_warmboot_cmd_file
+led_fw_dir

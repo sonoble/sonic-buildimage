@@ -4,13 +4,13 @@
 #include <linux/delay.h>
 #include "io_expander.h"
 #include "transceiver.h"
-
+#include "sff_io.h"
 /* For build single module using (Ex: ONL platform) */
 #include <linux/module.h>
 //#include <linux/inventec/d5254/io_expander.h>
 //#include <linux/inventec/d5254/transceiver.h>
-
 extern int io_no_init;
+#define DETECT_TYPE_TIMEOUT (20)
 /* ========== Register EEPROM address mapping ==========
  */
 struct eeprom_map_s eeprom_map_sfp = {
@@ -50,6 +50,22 @@ struct eeprom_map_s eeprom_map_sfp = {
     .addr_vendor_sn    =0x50,  .page_vendor_sn    =-1,  .offset_vendor_sn    =68,   .length_vendor_sn    =16,
     .addr_voltage      =0x51,  .page_voltage      =-1,  .offset_voltage      =98,   .length_voltage      =2,
     .addr_wavelength   =0x50,  .page_wavelength   =-1,  .offset_wavelength   =60,   .length_wavelength   =2,
+    .addr_eeprom       =0x50,  .page_eeprom       =-1,  .offset_eeprom       =0,    .length_eeprom       =256,
+    .addr_eeprom_a0    =0x50,  .page_eeprom_a0    =-1,  .offset_eeprom_a0    =0,    .length_eeprom_a0    =128,
+    .addr_eeprom_a2    =0x51,  .page_eeprom_a2    =-1,  .offset_eeprom_a2    =0,    .length_eeprom_a2    =128,
+    .addr_alarm_flag_byte_1             =0x51,  .page_alarm_flag_byte_1            =-1,  .offset_alarm_flag_byte_1            =112, .length_alarm_flag_byte_1            =1,
+    .addr_alarm_flag_byte_2             =0x51,  .page_alarm_flag_byte_2            =-1,  .offset_alarm_flag_byte_2            =113, .length_alarm_flag_byte_2            =1,
+    .addr_temp_high_alarm_threshold     =0x51,  .page_temp_high_alarm_threshold    =-1,  .offset_temp_high_alarm_threshold    =0,   .length_temp_high_alarm_threshold    =2,
+    .addr_temp_low_alarm_threshold      =0x51,  .page_temp_low_alarm_threshold     =-1,  .offset_temp_low_alarm_threshold     =2,   .length_temp_low_alarm_threshold     =2,
+    .addr_voltage_high_alarm_threshold  =0x51,  .page_voltage_high_alarm_threshold =-1,  .offset_voltage_high_alarm_threshold =8,   .length_voltage_high_alarm_threshold =2,
+    .addr_voltage_low_alarm_threshold   =0x51,  .page_voltage_low_alarm_threshold  =-1,  .offset_voltage_low_alarm_threshold  =10,  .length_voltage_low_alarm_threshold  =2,
+    .addr_bias_high_alarm_threshold     =0x51,  .page_bias_high_alarm_threshold    =-1,  .offset_bias_high_alarm_threshold    =16,  .length_bias_high_alarm_threshold    =2,
+    .addr_bias_low_alarm_threshold      =0x51,  .page_bias_low_alarm_threshold     =-1,  .offset_bias_low_alarm_threshold     =18,  .length_bias_low_alarm_threshold     =2,
+    .addr_tx_power_high_alarm_threshold =0x51,  .page_tx_power_high_alarm_threshold=-1,  .offset_tx_power_high_alarm_threshold=24,  .length_tx_power_high_alarm_threshold=2,
+    .addr_tx_power_low_alarm_threshold  =0x51,  .page_tx_power_low_alarm_threshold =-1,  .offset_tx_power_low_alarm_threshold =26,  .length_tx_power_low_alarm_threshold =2,
+    .addr_rx_power_high_alarm_threshold =0x51,  .page_rx_power_high_alarm_threshold=-1,  .offset_rx_power_high_alarm_threshold=32,  .length_rx_power_high_alarm_threshold=2,
+    .addr_rx_power_low_alarm_threshold  =0x51,  .page_rx_power_low_alarm_threshold =-1,  .offset_rx_power_low_alarm_threshold =34,  .length_rx_power_low_alarm_threshold =2,
+    .addr_manufacturing_date            =0x50,  .page_manufacturing_date           =-1,  .offset_manufacturing_date           =84,  .length_manufacturing_date           =8,
 };
 
 struct eeprom_map_s eeprom_map_qsfp = {
@@ -89,6 +105,24 @@ struct eeprom_map_s eeprom_map_qsfp = {
     .addr_vendor_sn    =0x50,  .page_vendor_sn    =0,   .offset_vendor_sn    =196,  .length_vendor_sn    =16,
     .addr_voltage      =0x50,  .page_voltage      =-1,  .offset_voltage      =26,   .length_voltage      =2,
     .addr_wavelength   =0x50,  .page_wavelength   =0,   .offset_wavelength   =186,  .length_wavelength   =2,
+    .addr_eeprom       =0x50,  .page_eeprom       =0,   .offset_eeprom       =0,    .length_eeprom       =256,
+    .addr_eeprom_page03=0x50,  .page_eeprom_page03=3,   .offset_eeprom_page03=128,  .length_eeprom_page03=128,
+    .addr_temp_alarm                    =0x50,  .page_temp_alarm                   =0,   .offset_temp_alarm                   =6,     .length_temp_alarm                   =1,
+    .addr_voltage_alarm                 =0x50,  .page_voltage_alarm                =0,   .offset_voltage_alarm                =7,     .length_voltage_alarm                =1,
+    .addr_rx_power_alarm                =0x50,  .page_rx_power_alarm               =0,   .offset_rx_power_alarm               =9,     .length_rx_power_alarm               =2,
+    .addr_bias_alarm                    =0x50,  .page_bias_alarm                   =0,   .offset_bias_alarm                   =11,    .length_bias_alarm                   =2,
+	.addr_tx_power_alarm                =0x50,  .page_tx_power_alarm               =0,   .offset_tx_power_alarm               =13,    .length_tx_power_alarm               =2,
+    .addr_temp_high_alarm_threshold     =0x50,  .page_temp_high_alarm_threshold    =3,   .offset_temp_high_alarm_threshold    =128,   .length_temp_high_alarm_threshold    =2,
+    .addr_temp_low_alarm_threshold      =0x50,  .page_temp_low_alarm_threshold     =3,   .offset_temp_low_alarm_threshold     =130,   .length_temp_low_alarm_threshold     =2,
+    .addr_voltage_high_alarm_threshold  =0x50,  .page_voltage_high_alarm_threshold =3,   .offset_voltage_high_alarm_threshold =144,   .length_voltage_high_alarm_threshold =2,
+    .addr_voltage_low_alarm_threshold   =0x50,  .page_voltage_low_alarm_threshold  =3,   .offset_voltage_low_alarm_threshold  =146,   .length_voltage_low_alarm_threshold  =2,
+    .addr_rx_power_high_alarm_threshold =0x50,  .page_rx_power_high_alarm_threshold=3,   .offset_rx_power_high_alarm_threshold=176,   .length_rx_power_high_alarm_threshold=2,
+    .addr_rx_power_low_alarm_threshold  =0x50,  .page_rx_power_low_alarm_threshold =3,   .offset_rx_power_low_alarm_threshold =178,   .length_rx_power_low_alarm_threshold =2,
+    .addr_bias_high_alarm_threshold     =0x50,  .page_bias_high_alarm_threshold    =3,   .offset_bias_high_alarm_threshold    =184,   .length_bias_high_alarm_threshold    =2,
+    .addr_bias_low_alarm_threshold      =0x50,  .page_bias_low_alarm_threshold     =3,   .offset_bias_low_alarm_threshold     =186,   .length_bias_low_alarm_threshold     =2,
+    .addr_tx_power_high_alarm_threshold =0x50,  .page_tx_power_high_alarm_threshold=3,   .offset_tx_power_high_alarm_threshold=192,   .length_tx_power_high_alarm_threshold=2,
+    .addr_tx_power_low_alarm_threshold  =0x50,  .page_tx_power_low_alarm_threshold =3,   .offset_tx_power_low_alarm_threshold =194,   .length_tx_power_low_alarm_threshold =2,
+	.addr_manufacturing_date            =0x50,  .page_manufacturing_date           =0,   .offset_manufacturing_date           =212,   .length_manufacturing_date           =8,
 };
 
 struct eeprom_map_s eeprom_map_qsfp28 = {
@@ -128,6 +162,24 @@ struct eeprom_map_s eeprom_map_qsfp28 = {
     .addr_vendor_sn    =0x50,  .page_vendor_sn    =0,   .offset_vendor_sn    =196,  .length_vendor_sn    =16,
     .addr_voltage      =0x50,  .page_voltage      =-1,  .offset_voltage      =26,   .length_voltage      =2,
     .addr_wavelength   =0x50,  .page_wavelength   =0,   .offset_wavelength   =186,  .length_wavelength   =2,
+    .addr_eeprom       =0x50,  .page_eeprom       =0,   .offset_eeprom       =0,    .length_eeprom       =256,
+    .addr_eeprom_page03=0x50,  .page_eeprom_page03=3,   .offset_eeprom_page03=128,  .length_eeprom_page03=128,
+    .addr_temp_alarm                    =0x50,  .page_temp_alarm                   =0,   .offset_temp_alarm                   =6,     .length_temp_alarm                   =1,
+    .addr_voltage_alarm                 =0x50,  .page_voltage_alarm                =0,   .offset_voltage_alarm                =7,     .length_voltage_alarm                =1,
+    .addr_rx_power_alarm                =0x50,  .page_rx_power_alarm               =0,   .offset_rx_power_alarm               =9,     .length_rx_power_alarm               =2,
+    .addr_bias_alarm                    =0x50,  .page_bias_alarm                   =0,   .offset_bias_alarm                   =11,    .length_bias_alarm                   =2,
+	.addr_tx_power_alarm                =0x50,  .page_tx_power_alarm               =0,   .offset_tx_power_alarm               =13,    .length_tx_power_alarm               =2,
+    .addr_temp_high_alarm_threshold     =0x50,  .page_temp_high_alarm_threshold    =3,   .offset_temp_high_alarm_threshold    =128,   .length_temp_high_alarm_threshold    =2,
+    .addr_temp_low_alarm_threshold      =0x50,  .page_temp_low_alarm_threshold     =3,   .offset_temp_low_alarm_threshold     =130,   .length_temp_low_alarm_threshold     =2,
+    .addr_voltage_high_alarm_threshold  =0x50,  .page_voltage_high_alarm_threshold =3,   .offset_voltage_high_alarm_threshold =144,   .length_voltage_high_alarm_threshold =2,
+    .addr_voltage_low_alarm_threshold   =0x50,  .page_voltage_low_alarm_threshold  =3,   .offset_voltage_low_alarm_threshold  =146,   .length_voltage_low_alarm_threshold  =2,
+    .addr_rx_power_high_alarm_threshold =0x50,  .page_rx_power_high_alarm_threshold=3,   .offset_rx_power_high_alarm_threshold=176,   .length_rx_power_high_alarm_threshold=2,
+    .addr_rx_power_low_alarm_threshold  =0x50,  .page_rx_power_low_alarm_threshold =3,   .offset_rx_power_low_alarm_threshold =178,   .length_rx_power_low_alarm_threshold =2,
+    .addr_bias_high_alarm_threshold     =0x50,  .page_bias_high_alarm_threshold    =3,   .offset_bias_high_alarm_threshold    =184,   .length_bias_high_alarm_threshold    =2,
+    .addr_bias_low_alarm_threshold      =0x50,  .page_bias_low_alarm_threshold     =3,   .offset_bias_low_alarm_threshold     =186,   .length_bias_low_alarm_threshold     =2,
+    .addr_tx_power_high_alarm_threshold =0x50,  .page_tx_power_high_alarm_threshold=3,   .offset_tx_power_high_alarm_threshold=192,   .length_tx_power_high_alarm_threshold=2,
+    .addr_tx_power_low_alarm_threshold  =0x50,  .page_tx_power_low_alarm_threshold =3,   .offset_tx_power_low_alarm_threshold =194,   .length_tx_power_low_alarm_threshold =2,
+	.addr_manufacturing_date            =0x50,  .page_manufacturing_date           =0,   .offset_manufacturing_date           =212,   .length_manufacturing_date           =8,
 };
 
 
@@ -159,6 +211,9 @@ _reload_transvr_obj(struct transvr_obj_s *self,int new_type);
 
 static int
 reload_transvr_obj(struct transvr_obj_s *self,int new_type);
+
+static int
+_is_transvr_support_page03(struct transvr_obj_s *self);
 
 static int
 _is_transvr_support_ctle(struct transvr_obj_s *self);
@@ -630,6 +685,18 @@ _common_update_attr_transvr_comp_ext(struct transvr_obj_s *self,
                                      show_err);
 }
 
+static int
+_common_update_attr_eeprom(struct transvr_obj_s *self,
+                       int show_err){
+    return _common_update_string_attr(self,
+                                     self->eeprom_map_p->addr_eeprom,
+                                     self->eeprom_map_p->page_eeprom,
+                                     self->eeprom_map_p->offset_eeprom,
+                                     self->eeprom_map_p->length_eeprom,
+                                     self->eeprom,
+                                     "_common_update_attr_eeprom",
+                                     show_err);
+}
 
 static int
 _common_update_attr_vendor_name(struct transvr_obj_s *self,
@@ -840,6 +907,31 @@ _common_get_option_value(struct transvr_obj_s *self,
     return (self->option[offset] & (1 << bit_shift));
 }
 
+static int
+_common_update_attr_manufacturing_date(struct transvr_obj_s *self,
+                            int show_err){
+    return _common_update_uint8_attr(self,
+                                   self->eeprom_map_p->addr_manufacturing_date,
+                                   self->eeprom_map_p->page_manufacturing_date,
+                                   self->eeprom_map_p->offset_manufacturing_date,
+                                   self->eeprom_map_p->length_manufacturing_date,
+                                   self->manufacturing_date,
+                                   "_common_update_attr_manufacturing_date",
+                                   show_err);
+}
+
+static int
+_sfp_update_attr_eeprom_a0(struct transvr_obj_s *self,
+                       int show_err){
+    return _common_update_string_attr(self,
+                                     self->eeprom_map_p->addr_eeprom_a0,
+                                     self->eeprom_map_p->page_eeprom_a0,
+                                     self->eeprom_map_p->offset_eeprom_a0,
+                                     self->eeprom_map_p->length_eeprom_a0,
+                                     self->eeprom_a0,
+                                     "_sfp_update_attr_eeprom_a0",
+                                     show_err);
+}
 
 static int
 _sfp_update_attr_len_sm(struct transvr_obj_s *self,
@@ -910,6 +1002,226 @@ _sfp_is_diag_support(struct transvr_obj_s *self){
     return 0;
 }
 
+static int
+_sfp_update_attr_alarm_flag_byte_1(struct transvr_obj_s *self,
+                       int show_err){
+
+    if (!(_sfp_is_diag_support(self))) {
+        return ERR_TRANSVR_NOTSUPPORT;
+    }
+    return _common_update_uint8_attr(self,
+                                     self->eeprom_map_p->addr_alarm_flag_byte_1,
+                                     self->eeprom_map_p->page_alarm_flag_byte_1,
+                                     self->eeprom_map_p->offset_alarm_flag_byte_1,
+                                     self->eeprom_map_p->length_alarm_flag_byte_1,
+                                     &(self->alarm_flag_byte_1),
+                                     "_sfp_update_attr_alarm_flag_byte_1",
+                                     show_err);
+}
+
+static int
+_sfp_update_attr_alarm_flag_byte_2(struct transvr_obj_s *self,
+                       int show_err){
+
+    if (!(_sfp_is_diag_support(self))) {
+        return ERR_TRANSVR_NOTSUPPORT;
+    }
+    return _common_update_uint8_attr(self,
+                                     self->eeprom_map_p->addr_alarm_flag_byte_2,
+                                     self->eeprom_map_p->page_alarm_flag_byte_2,
+                                     self->eeprom_map_p->offset_alarm_flag_byte_2,
+                                     self->eeprom_map_p->length_alarm_flag_byte_2,
+                                     &(self->alarm_flag_byte_2),
+                                     "_sfp_update_attr_alarm_flag_byte_2",
+                                     show_err);
+}
+
+static int
+_sfp_update_attr_temp_high_alarm_threshold(struct transvr_obj_s *self,
+                       int show_err){
+
+    if (!(_sfp_is_diag_support(self))) {
+        return ERR_TRANSVR_NOTSUPPORT;
+    }
+    return _common_update_uint8_attr(self,
+                                     self->eeprom_map_p->addr_temp_high_alarm_threshold,
+                                     self->eeprom_map_p->page_temp_high_alarm_threshold,
+                                     self->eeprom_map_p->offset_temp_high_alarm_threshold,
+                                     self->eeprom_map_p->length_temp_high_alarm_threshold,
+                                     self->temp_high_alarm_threshold,
+                                     "_sfp_update_attr_temp_high_alarm_threshold",
+                                     show_err);
+}
+
+static int
+_sfp_update_attr_temp_low_alarm_threshold(struct transvr_obj_s *self,
+                       int show_err){
+
+    if (!(_sfp_is_diag_support(self))) {
+        return ERR_TRANSVR_NOTSUPPORT;
+    }
+    return _common_update_uint8_attr(self,
+                                     self->eeprom_map_p->addr_temp_low_alarm_threshold,
+                                     self->eeprom_map_p->page_temp_low_alarm_threshold,
+                                     self->eeprom_map_p->offset_temp_low_alarm_threshold,
+                                     self->eeprom_map_p->length_temp_low_alarm_threshold,
+                                     self->temp_low_alarm_threshold,
+                                     "_sfp_update_attr_temp_low_alarm_threshold",
+                                     show_err);
+}
+
+static int
+_sfp_update_attr_voltage_high_alarm_threshold(struct transvr_obj_s *self,
+                       int show_err){
+
+    if (!(_sfp_is_diag_support(self))) {
+        return ERR_TRANSVR_NOTSUPPORT;
+    }
+    return _common_update_uint8_attr(self,
+                                     self->eeprom_map_p->addr_voltage_high_alarm_threshold,
+                                     self->eeprom_map_p->page_voltage_high_alarm_threshold,
+                                     self->eeprom_map_p->offset_voltage_high_alarm_threshold,
+                                     self->eeprom_map_p->length_voltage_high_alarm_threshold,
+                                     self->voltage_high_alarm_threshold,
+                                     "_sfp_update_attr_voltage_high_alarm_threshold",
+                                     show_err);
+}
+
+static int
+_sfp_update_attr_voltage_low_alarm_threshold(struct transvr_obj_s *self,
+                       int show_err){
+
+    if (!(_sfp_is_diag_support(self))) {
+        return ERR_TRANSVR_NOTSUPPORT;
+    }
+    return _common_update_uint8_attr(self,
+                                     self->eeprom_map_p->addr_voltage_low_alarm_threshold,
+                                     self->eeprom_map_p->page_voltage_low_alarm_threshold,
+                                     self->eeprom_map_p->offset_voltage_low_alarm_threshold,
+                                     self->eeprom_map_p->length_voltage_low_alarm_threshold,
+                                     self->voltage_low_alarm_threshold,
+                                     "_sfp_update_attr_voltage_low_alarm_threshold",
+                                     show_err);
+}
+
+static int
+_sfp_update_attr_bias_high_alarm_threshold(struct transvr_obj_s *self,
+                       int show_err){
+
+    if (!(_sfp_is_diag_support(self))) {
+        return ERR_TRANSVR_NOTSUPPORT;
+    }
+    return _common_update_uint8_attr(self,
+                                     self->eeprom_map_p->addr_bias_high_alarm_threshold,
+                                     self->eeprom_map_p->page_bias_high_alarm_threshold,
+                                     self->eeprom_map_p->offset_bias_high_alarm_threshold,
+                                     self->eeprom_map_p->length_bias_high_alarm_threshold,
+                                     self->bias_high_alarm_threshold,
+                                     "_sfp_update_attr_bias_high_alarm_threshold",
+                                     show_err);
+}
+
+static int
+_sfp_update_attr_bias_low_alarm_threshold(struct transvr_obj_s *self,
+                       int show_err){
+
+    if (!(_sfp_is_diag_support(self))) {
+        return ERR_TRANSVR_NOTSUPPORT;
+    }
+    return _common_update_uint8_attr(self,
+                                     self->eeprom_map_p->addr_bias_low_alarm_threshold,
+                                     self->eeprom_map_p->page_bias_low_alarm_threshold,
+                                     self->eeprom_map_p->offset_bias_low_alarm_threshold,
+                                     self->eeprom_map_p->length_bias_low_alarm_threshold,
+                                     self->bias_low_alarm_threshold,
+                                     "_sfp_update_attr_bias_low_alarm_threshold",
+                                     show_err);
+}
+
+static int
+_sfp_update_attr_tx_power_high_alarm_threshold(struct transvr_obj_s *self,
+                       int show_err){
+
+    if (!(_sfp_is_diag_support(self))) {
+        return ERR_TRANSVR_NOTSUPPORT;
+    }
+    return _common_update_uint8_attr(self,
+                                     self->eeprom_map_p->addr_tx_power_high_alarm_threshold,
+                                     self->eeprom_map_p->page_tx_power_high_alarm_threshold,
+                                     self->eeprom_map_p->offset_tx_power_high_alarm_threshold,
+                                     self->eeprom_map_p->length_tx_power_high_alarm_threshold,
+                                     self->tx_power_high_alarm_threshold,
+                                     "_sfp_update_attr_tx_power_high_alarm_threshold",
+                                     show_err);
+}
+
+static int
+_sfp_update_attr_tx_power_low_alarm_threshold(struct transvr_obj_s *self,
+                       int show_err){
+
+    if (!(_sfp_is_diag_support(self))) {
+        return ERR_TRANSVR_NOTSUPPORT;
+    }
+    return _common_update_uint8_attr(self,
+                                     self->eeprom_map_p->addr_tx_power_low_alarm_threshold,
+                                     self->eeprom_map_p->page_tx_power_low_alarm_threshold,
+                                     self->eeprom_map_p->offset_tx_power_low_alarm_threshold,
+                                     self->eeprom_map_p->length_tx_power_low_alarm_threshold,
+                                     self->tx_power_low_alarm_threshold,
+                                     "_sfp_update_attr_tx_power_low_alarm_threshold",
+                                     show_err);
+}
+
+static int
+_sfp_update_attr_rx_power_high_alarm_threshold(struct transvr_obj_s *self,
+                       int show_err){
+
+    if (!(_sfp_is_diag_support(self))) {
+        return ERR_TRANSVR_NOTSUPPORT;
+    }
+    return _common_update_uint8_attr(self,
+                                     self->eeprom_map_p->addr_rx_power_high_alarm_threshold,
+                                     self->eeprom_map_p->page_rx_power_high_alarm_threshold,
+                                     self->eeprom_map_p->offset_rx_power_high_alarm_threshold,
+                                     self->eeprom_map_p->length_rx_power_high_alarm_threshold,
+                                     self->rx_power_high_alarm_threshold,
+                                     "_sfp_update_attr_rx_power_high_alarm_threshold",
+                                     show_err);
+}
+
+static int
+_sfp_update_attr_rx_power_low_alarm_threshold(struct transvr_obj_s *self,
+                       int show_err){
+
+    if (!(_sfp_is_diag_support(self))) {
+        return ERR_TRANSVR_NOTSUPPORT;
+    }
+    return _common_update_uint8_attr(self,
+                                     self->eeprom_map_p->addr_rx_power_low_alarm_threshold,
+                                     self->eeprom_map_p->page_rx_power_low_alarm_threshold,
+                                     self->eeprom_map_p->offset_rx_power_low_alarm_threshold,
+                                     self->eeprom_map_p->length_rx_power_low_alarm_threshold,
+                                     self->rx_power_low_alarm_threshold,
+                                     "_sfp_update_attr_rx_power_low_alarm_threshold",
+                                     show_err);
+}
+
+static int
+_sfp_update_attr_eeprom_a2(struct transvr_obj_s *self,
+                       int show_err){
+
+    if (!(_sfp_is_diag_support(self))) {
+        return ERR_TRANSVR_NOTSUPPORT;
+    }
+    return _common_update_string_attr(self,
+                                     self->eeprom_map_p->addr_eeprom_a2,
+                                     self->eeprom_map_p->page_eeprom_a2,
+                                     self->eeprom_map_p->offset_eeprom_a2,
+                                     self->eeprom_map_p->length_eeprom_a2,
+                                     self->eeprom_a2,
+                                     "_sfp_update_attr_eeprom_a2",
+                                     show_err);
+}
 
 static int
 _sfp_update_attr_curr_temp(struct transvr_obj_s *self,
@@ -1068,6 +1380,22 @@ _qsfg_update_attr_extbr(struct transvr_obj_s *self,
                                      show_err);
 }
 
+static int
+_qsfp_update_attr_eeprom_page03(struct transvr_obj_s *self,
+                       int show_err){
+
+    if (!_is_transvr_support_page03(self)) {
+        return ERR_TRANSVR_NOTSUPPORT;
+    }
+    return _common_update_string_attr(self,
+                                     self->eeprom_map_p->addr_eeprom_page03,
+                                     self->eeprom_map_p->page_eeprom_page03,
+                                     self->eeprom_map_p->offset_eeprom_page03,
+                                     self->eeprom_map_p->length_eeprom_page03,
+                                     self->eeprom_page03,
+                                     "_qsfp_update_attr_eeprom_page03",
+                                     show_err);
+}
 
 static int
 _qsfp_is_diag_support(struct transvr_obj_s *self,
@@ -1128,6 +1456,270 @@ _qsfp_is_implement_tx_fault(struct transvr_obj_s *self) {
     return _common_get_option_value(self, byte, bit);
 }
 
+static int
+_qsfp_update_attr_temp_high_alarm_threshold(struct transvr_obj_s *self,
+                            int show_err){
+
+    if (!_is_transvr_support_page03(self)) {
+        return ERR_TRANSVR_NOTSUPPORT;
+    }
+    return _common_update_uint8_attr(self,
+                                     self->eeprom_map_p->addr_temp_high_alarm_threshold,
+                                     self->eeprom_map_p->page_temp_high_alarm_threshold,
+                                     self->eeprom_map_p->offset_temp_high_alarm_threshold,
+                                     self->eeprom_map_p->length_temp_high_alarm_threshold,
+                                     self->temp_high_alarm_threshold,
+                                     "_qsfp_update_attr_temp_high_alarm_threshold",
+                                     show_err);
+}
+
+static int
+_qsfp_update_attr_temp_low_alarm_threshold(struct transvr_obj_s *self,
+                            int show_err){
+
+    if (!_is_transvr_support_page03(self)) {
+        return ERR_TRANSVR_NOTSUPPORT;
+    }
+    return _common_update_uint8_attr(self,
+                                     self->eeprom_map_p->addr_temp_low_alarm_threshold,
+                                     self->eeprom_map_p->page_temp_low_alarm_threshold,
+                                     self->eeprom_map_p->offset_temp_low_alarm_threshold,
+                                     self->eeprom_map_p->length_temp_low_alarm_threshold,
+                                     self->temp_low_alarm_threshold,
+                                     "_qsfp_update_attr_temp_low_alarm_threshold",
+                                     show_err);
+}
+
+static int
+_qsfp_update_attr_voltage_high_alarm_threshold(struct transvr_obj_s *self,
+                            int show_err){
+
+    if (!_is_transvr_support_page03(self)) {
+        return ERR_TRANSVR_NOTSUPPORT;
+    }
+    return _common_update_uint8_attr(self,
+                                     self->eeprom_map_p->addr_voltage_high_alarm_threshold,
+                                     self->eeprom_map_p->page_voltage_high_alarm_threshold,
+                                     self->eeprom_map_p->offset_voltage_high_alarm_threshold,
+                                     self->eeprom_map_p->length_voltage_high_alarm_threshold,
+                                     self->voltage_high_alarm_threshold,
+                                     "_qsfp_update_attr_voltage_high_alarm_threshold",
+                                     show_err);
+}
+
+static int
+_qsfp_update_attr_voltage_low_alarm_threshold(struct transvr_obj_s *self,
+                            int show_err){
+
+    if (!_is_transvr_support_page03(self)) {
+        return ERR_TRANSVR_NOTSUPPORT;
+    }
+    return _common_update_uint8_attr(self,
+                                     self->eeprom_map_p->addr_voltage_low_alarm_threshold,
+                                     self->eeprom_map_p->page_voltage_low_alarm_threshold,
+                                     self->eeprom_map_p->offset_voltage_low_alarm_threshold,
+                                     self->eeprom_map_p->length_voltage_low_alarm_threshold,
+                                     self->voltage_low_alarm_threshold,
+                                     "_qsfp_update_attr_voltage_low_alarm_threshold",
+                                     show_err);
+}
+
+static int
+_qsfp_update_attr_bias_low_alarm_threshold(struct transvr_obj_s *self,
+                            int show_err){
+
+    if (!_is_transvr_support_page03(self)) {
+        return ERR_TRANSVR_NOTSUPPORT;
+    }
+    return _common_update_uint8_attr(self,
+                                     self->eeprom_map_p->addr_bias_low_alarm_threshold,
+                                     self->eeprom_map_p->page_bias_low_alarm_threshold,
+                                     self->eeprom_map_p->offset_bias_low_alarm_threshold,
+                                     self->eeprom_map_p->length_bias_low_alarm_threshold,
+                                     self->bias_low_alarm_threshold,
+                                     "_qsfp_update_attr_bias_low_alarm_threshold",
+                                     show_err);
+}
+
+static int
+_qsfp_update_attr_bias_high_alarm_threshold(struct transvr_obj_s *self,
+                            int show_err){
+
+    if (!_is_transvr_support_page03(self)) {
+        return ERR_TRANSVR_NOTSUPPORT;
+    }
+    return _common_update_uint8_attr(self,
+                                     self->eeprom_map_p->addr_bias_high_alarm_threshold,
+                                     self->eeprom_map_p->page_bias_high_alarm_threshold,
+                                     self->eeprom_map_p->offset_bias_high_alarm_threshold,
+                                     self->eeprom_map_p->length_bias_high_alarm_threshold,
+                                     self->bias_high_alarm_threshold,
+                                     "_qsfp_update_attr_bias_high_alarm_threshold",
+                                     show_err);
+}
+
+static int
+_qsfp_update_attr_tx_power_low_alarm_threshold(struct transvr_obj_s *self,
+                            int show_err){
+
+    if (!_is_transvr_support_page03(self)) {
+        return ERR_TRANSVR_NOTSUPPORT;
+    }
+    return _common_update_uint8_attr(self,
+                                     self->eeprom_map_p->addr_tx_power_low_alarm_threshold,
+                                     self->eeprom_map_p->page_tx_power_low_alarm_threshold,
+                                     self->eeprom_map_p->offset_tx_power_low_alarm_threshold,
+                                     self->eeprom_map_p->length_tx_power_low_alarm_threshold,
+                                     self->tx_power_low_alarm_threshold,
+                                     "_qsfp_update_attr_tx_power_low_alarm_threshold",
+                                     show_err);
+}
+
+static int
+_qsfp_update_attr_tx_power_high_alarm_threshold(struct transvr_obj_s *self,
+                            int show_err){
+
+    if (!_is_transvr_support_page03(self)) {
+        return ERR_TRANSVR_NOTSUPPORT;
+    }
+    return _common_update_uint8_attr(self,
+                                     self->eeprom_map_p->addr_tx_power_high_alarm_threshold,
+                                     self->eeprom_map_p->page_tx_power_high_alarm_threshold,
+                                     self->eeprom_map_p->offset_tx_power_high_alarm_threshold,
+                                     self->eeprom_map_p->length_tx_power_high_alarm_threshold,
+                                     self->tx_power_high_alarm_threshold,
+                                     "_qsfp_update_attr_tx_power_high_alarm_threshold",
+                                     show_err);
+}
+
+static int
+_qsfp_update_attr_rx_power_low_alarm_threshold(struct transvr_obj_s *self,
+                            int show_err){
+
+    if (!_is_transvr_support_page03(self)) {
+        return ERR_TRANSVR_NOTSUPPORT;
+    }
+    return _common_update_uint8_attr(self,
+                                     self->eeprom_map_p->addr_rx_power_low_alarm_threshold,
+                                     self->eeprom_map_p->page_rx_power_low_alarm_threshold,
+                                     self->eeprom_map_p->offset_rx_power_low_alarm_threshold,
+                                     self->eeprom_map_p->length_rx_power_low_alarm_threshold,
+                                     self->rx_power_low_alarm_threshold,
+                                     "_qsfp_update_attr_rx_power_low_alarm_threshold",
+                                     show_err);
+}
+
+static int
+_qsfp_update_attr_rx_power_high_alarm_threshold(struct transvr_obj_s *self,
+                            int show_err){
+
+    if (!_is_transvr_support_page03(self)) {
+        return ERR_TRANSVR_NOTSUPPORT;
+    }
+    return _common_update_uint8_attr(self,
+                                     self->eeprom_map_p->addr_rx_power_high_alarm_threshold,
+                                     self->eeprom_map_p->page_rx_power_high_alarm_threshold,
+                                     self->eeprom_map_p->offset_rx_power_high_alarm_threshold,
+                                     self->eeprom_map_p->length_rx_power_high_alarm_threshold,
+                                     self->rx_power_high_alarm_threshold,
+                                     "_qsfp_update_attr_rx_power_high_alarm_threshold",
+                                     show_err);
+}
+
+static int
+_qsfp_update_attr_temp_alarm(struct transvr_obj_s *self,
+                            int show_err){
+
+    int diag_type = 1;
+
+    if (!(_qsfp_is_diag_support(self, diag_type))) {
+        return ERR_TRANSVR_NOTSUPPORT;
+    }
+    return _common_update_uint8_attr(self,
+                                     self->eeprom_map_p->addr_temp_alarm,
+                                     self->eeprom_map_p->page_temp_alarm,
+                                     self->eeprom_map_p->offset_temp_alarm,
+                                     self->eeprom_map_p->length_temp_alarm,
+                                     &(self->temp_alarm),
+                                     "_qsfp_update_attr_temp_alarm",
+                                     show_err);
+}
+
+static int
+_qsfp_update_attr_voltage_alarm(struct transvr_obj_s *self,
+                            int show_err){
+
+    int diag_type = 2;
+
+    if (!(_qsfp_is_diag_support(self, diag_type))) {
+        return ERR_TRANSVR_NOTSUPPORT;
+    }
+    return _common_update_uint8_attr(self,
+                                     self->eeprom_map_p->addr_voltage_alarm,
+                                     self->eeprom_map_p->page_voltage_alarm,
+                                     self->eeprom_map_p->offset_voltage_alarm,
+                                     self->eeprom_map_p->length_voltage_alarm,
+                                     &(self->voltage_alarm),
+                                     "_qsfp_update_attr_voltage_alarm",
+                                     show_err);
+}
+
+static int
+_qsfp_update_attr_bias_alarm(struct transvr_obj_s *self,
+                            int show_err){
+
+    int diag_type = 3;
+
+    if (!(_qsfp_is_diag_support(self, diag_type))) {
+        return ERR_TRANSVR_NOTSUPPORT;
+    }
+    return _common_update_uint8_attr(self,
+                                     self->eeprom_map_p->addr_bias_alarm,
+                                     self->eeprom_map_p->page_bias_alarm,
+                                     self->eeprom_map_p->offset_bias_alarm,
+                                     self->eeprom_map_p->length_bias_alarm,
+                                     self->bias_alarm,
+                                     "_qsfp_update_attr_bias_alarm",
+                                     show_err);
+}
+
+static int
+_qsfp_update_attr_tx_power_alarm(struct transvr_obj_s *self,
+                            int show_err){
+
+    int diag_type = 3;
+
+    if (!(_qsfp_is_diag_support(self, diag_type))) {
+        return ERR_TRANSVR_NOTSUPPORT;
+    }
+    return _common_update_uint8_attr(self,
+                                     self->eeprom_map_p->addr_tx_power_alarm,
+                                     self->eeprom_map_p->page_tx_power_alarm,
+                                     self->eeprom_map_p->offset_tx_power_alarm,
+                                     self->eeprom_map_p->length_tx_power_alarm,
+                                     self->tx_power_alarm,
+                                     "_qsfp_update_attr_tx_power_alarm",
+                                     show_err);
+}
+
+static int
+_qsfp_update_attr_rx_power_alarm(struct transvr_obj_s *self,
+                            int show_err){
+
+    int diag_type = 4;
+
+    if (!(_qsfp_is_diag_support(self, diag_type))) {
+        return ERR_TRANSVR_NOTSUPPORT;
+    }
+    return _common_update_uint8_attr(self,
+                                     self->eeprom_map_p->addr_rx_power_alarm,
+                                     self->eeprom_map_p->page_rx_power_alarm,
+                                     self->eeprom_map_p->offset_rx_power_alarm,
+                                     self->eeprom_map_p->length_rx_power_alarm,
+                                     self->rx_power_alarm,
+                                     "_qsfp_update_attr_rx_power_alarm",
+                                     show_err);
+}
 
 static int
 _qsfp_update_attr_curr_temp(struct transvr_obj_s *self,
@@ -1504,9 +2096,7 @@ _common_count_temp(uint8_t high_byte,
     sign = get_bit(high_byte,7);
     SWP_BIT_CLEAR(high_byte, 7);
     high = (int)high_byte;
-    if (sign == 1) {
-        high = 0 - high;
-    }
+
     /* Count low */
     low  = (get_bit(low_byte, 7) * 500);
     low += (get_bit(low_byte, 6) * 250);
@@ -1514,6 +2104,10 @@ _common_count_temp(uint8_t high_byte,
     low += (get_bit(low_byte, 4) *  62);
     low  = (low / 100);
     /* Integrate High and Low */
+    if (sign == 1) {
+        high = 0 - (127 - high);
+        low = 0 - low;
+    }
     return snprintf(buf_p, lmax, "%d.%d\n", high, low);
 }
 
@@ -1696,6 +2290,21 @@ common_get_connector(struct transvr_obj_s *self){
     return (int)self->connector;
 }
 
+int
+common_get_eeprom(struct transvr_obj_s *self, char *buf){
+
+    int err = DEBUG_TRANSVR_INT_VAL;
+
+    err = _check_by_mode(self,
+                         &_common_update_attr_eeprom,
+                         "common_get_eeprom");
+    if (err < 0){
+        return snprintf(buf, LEN_TRANSVR_M_STR, "%d\n", err);
+    }
+    memset(buf, 0, self->eeprom_map_p->length_eeprom);
+    memcpy(buf, self->eeprom, self->eeprom_map_p->length_eeprom);
+    return self->eeprom_map_p->length_eeprom;
+}
 
 int
 common_get_vendor_name(struct transvr_obj_s *self, char *buf){
@@ -1984,6 +2593,31 @@ common_get_if_lane(struct transvr_obj_s *self,
     return snprintf(buf_p, LEN_TRANSVR_M_STR, "%s\n" ,tmp_str);
 }
 
+int
+common_get_manufacturing_date(struct transvr_obj_s *self,
+                         char *buf_p) {
+
+    int lmax      = 16;
+    int err_code  = DEBUG_TRANSVR_INT_VAL;
+
+    err_code = _check_by_mode(self,
+                              &_common_update_attr_manufacturing_date,
+                              "common_get_manufacturing_date");
+    if (err_code < 0) {
+        return snprintf(buf_p, lmax, "%d\n", err_code);
+    }
+    if ( self->manufacturing_date == DEBUG_TRANSVR_HEX_VAL ) {
+        return snprintf(buf_p, lmax, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    return snprintf(buf_p, lmax, "20%c%c-%c%c-%c%c %c%c\n", self->manufacturing_date[0],
+	                                                    self->manufacturing_date[1],
+														self->manufacturing_date[2],
+														self->manufacturing_date[3],
+														self->manufacturing_date[4],
+														self->manufacturing_date[5],
+														self->manufacturing_date[6],
+														self->manufacturing_date[7]);
+}
 
 int
 sfp_get_len_sm(struct transvr_obj_s *self){
@@ -2188,7 +2822,7 @@ sfp_get_transvr_rx_power(struct transvr_obj_s *self,
     }
     /* Return Unit: 1 mW */
     return _common_count_rx_power(self->curr_rx_power[0],
-                                  self->curr_rx_power[0],
+                                  self->curr_rx_power[1],
                                   buf_p);
 }
 
@@ -2431,6 +3065,563 @@ ok_sfp_get_1g_rj45_extphy_reg:
     return snprintf(buf, LEN_TRANSVR_S_STR, "0x%04x\n", ret);
 }
 
+int
+sfp_get_eeprom_a0(struct transvr_obj_s *self, char *buf){
+
+    int err = DEBUG_TRANSVR_INT_VAL;
+
+    err = _check_by_mode(self,
+                         &_sfp_update_attr_eeprom_a0,
+                         "sfp_get_eeprom_a0");
+    if (err < 0){
+        return snprintf(buf, LEN_TRANSVR_M_STR, "%d\n", err);
+    }
+    memset(buf, 0, self->eeprom_map_p->length_eeprom_a0);
+    memcpy(buf, self->eeprom_a0, self->eeprom_map_p->length_eeprom_a0);
+    return self->eeprom_map_p->length_eeprom_a0;
+}
+
+int
+sfp_get_eeprom_a2(struct transvr_obj_s *self, char *buf){
+
+    int err = DEBUG_TRANSVR_INT_VAL;
+
+    err = _check_by_mode(self,
+                         &_sfp_update_attr_eeprom_a2,
+                         "sfp_get_eeprom_a2");
+    if (err < 0){
+        return snprintf(buf, LEN_TRANSVR_M_STR, "%d\n", err);
+    }
+    memset(buf, 0, self->eeprom_map_p->length_eeprom_a2);
+    memcpy(buf, self->eeprom_a2, self->eeprom_map_p->length_eeprom_a2);
+    return self->eeprom_map_p->length_eeprom_a2;
+}
+
+int
+sfp_get_temp_high_alarm(struct transvr_obj_s *self,
+                     char *buf_p) {
+
+    int limt = 8;
+    int err_code = DEBUG_TRANSVR_INT_VAL;
+
+    err_code = _check_by_mode(self,
+                              &_sfp_update_attr_alarm_flag_byte_1,
+                              "sfp_get_temp_high_alarm");
+    if (err_code < 0) {
+        return snprintf(buf_p, limt, "%d\n", err_code);
+    }
+    if ( self->alarm_flag_byte_1 == DEBUG_TRANSVR_HEX_VAL ) {
+        return snprintf(buf_p, limt, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* [Prop]: SFP Alarm Flag bit
+     * [Desc]: SFP Alarm Flag bit
+     * [Note]: SFP+/28 => SFF-8472 A2H Byte-112
+     *        Temp High Alarm Bit-7
+     *        Temp Low  Alarm Bit-6
+     *	      Vcc High  Alarm Bit-5
+	 *        Vcc Low   Alarm Bit-4
+	 *        Tx Bias   Alarm Bit-3
+	 *        Tx Bias   Alarm Bit-2
+	 *        Tx Power  Alarm Bit-1
+	 *        Tx Power  Alarm Bit-0
+	 */
+	return snprintf(buf_p, limt, "%d\n", get_bit( self->alarm_flag_byte_1 ,7));
+
+}
+
+int
+sfp_get_temp_low_alarm(struct transvr_obj_s *self,
+                     char *buf_p) {
+
+    int limt = 8;
+    int err_code = DEBUG_TRANSVR_INT_VAL;
+
+    err_code = _check_by_mode(self,
+                              &_sfp_update_attr_alarm_flag_byte_1,
+                              "sfp_get_temp_low_alarm");
+    if (err_code < 0) {
+        return snprintf(buf_p, limt, "%d\n", err_code);
+    }
+    if ( self->alarm_flag_byte_1 == DEBUG_TRANSVR_HEX_VAL ) {
+        return snprintf(buf_p, limt, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* [Prop]: SFP Alarm Flag bit
+     * [Desc]: SFP Alarm Flag bit
+     * [Note]: SFP+/28 => SFF-8472 A2H Byte-112
+     *        Temp High Alarm Bit-7
+     *        Temp Low  Alarm Bit-6
+     *	      Vcc High  Alarm Bit-5
+	 *        Vcc Low   Alarm Bit-4
+	 *        Tx Bias   Alarm Bit-3
+	 *        Tx Bias   Alarm Bit-2
+	 *        Tx Power  Alarm Bit-1
+	 *        Tx Power  Alarm Bit-0
+	 */
+	return snprintf(buf_p, limt, "%d\n", get_bit( self->alarm_flag_byte_1 ,6));
+
+}
+
+int
+sfp_get_voltage_high_alarm(struct transvr_obj_s *self,
+                     char *buf_p) {
+
+    int limt = 8;
+    int err_code = DEBUG_TRANSVR_INT_VAL;
+
+    err_code = _check_by_mode(self,
+                              &_sfp_update_attr_alarm_flag_byte_1,
+                              "sfp_get_voltage_high_alarm");
+    if (err_code < 0) {
+        return snprintf(buf_p, limt, "%d\n", err_code);
+    }
+    if ( self->alarm_flag_byte_1 == DEBUG_TRANSVR_HEX_VAL ) {
+        return snprintf(buf_p, limt, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* [Prop]: SFP Alarm Flag bit
+     * [Desc]: SFP Alarm Flag bit
+     * [Note]: SFP+/28 => SFF-8472 A2H Byte-112
+     *        Temp High Alarm Bit-7
+     *        Temp Low  Alarm Bit-6
+     *	      Vcc High  Alarm Bit-5
+	 *        Vcc Low   Alarm Bit-4
+	 *        Tx Bias   Alarm Bit-3
+	 *        Tx Bias   Alarm Bit-2
+	 *        Tx Power  Alarm Bit-1
+	 *        Tx Power  Alarm Bit-0
+	 */
+	return snprintf(buf_p, limt, "%d\n", get_bit( self->alarm_flag_byte_1 ,5));
+
+}
+
+int
+sfp_get_voltage_low_alarm(struct transvr_obj_s *self,
+                     char *buf_p) {
+
+    int limt = 8;
+    int err_code = DEBUG_TRANSVR_INT_VAL;
+
+    err_code = _check_by_mode(self,
+                              &_sfp_update_attr_alarm_flag_byte_1,
+                              "sfp_get_voltage_low_alarm");
+    if (err_code < 0) {
+        return snprintf(buf_p, limt, "%d\n", err_code);
+    }
+    if ( self->alarm_flag_byte_1 == DEBUG_TRANSVR_HEX_VAL ) {
+        return snprintf(buf_p, limt, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* [Prop]: SFP Alarm Flag bit
+     * [Desc]: SFP Alarm Flag bit
+     * [Note]: SFP+/28 => SFF-8472 A2H Byte-112
+     *        Temp High Alarm Bit-7
+     *        Temp Low  Alarm Bit-6
+     *	      Vcc High  Alarm Bit-5
+	 *        Vcc Low   Alarm Bit-4
+	 *        Tx Bias   Alarm Bit-3
+	 *        Tx Bias   Alarm Bit-2
+	 *        Tx Power  Alarm Bit-1
+	 *        Tx Power  Alarm Bit-0
+	 */
+	return snprintf(buf_p, limt, "%d\n", get_bit( self->alarm_flag_byte_1 ,4));
+
+}
+
+int
+sfp_get_bias_high_alarm(struct transvr_obj_s *self,
+                     char *buf_p) {
+
+    int limt = 8;
+    int err_code = DEBUG_TRANSVR_INT_VAL;
+
+    err_code = _check_by_mode(self,
+                              &_sfp_update_attr_alarm_flag_byte_1,
+                              "sfp_get_bias_high_alarm");
+    if (err_code < 0) {
+        return snprintf(buf_p, limt, "%d\n", err_code);
+    }
+    if ( self->alarm_flag_byte_1 == DEBUG_TRANSVR_HEX_VAL ) {
+        return snprintf(buf_p, limt, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* [Prop]: SFP Alarm Flag bit
+     * [Desc]: SFP Alarm Flag bit
+     * [Note]: SFP+/28 => SFF-8472 A2H Byte-112
+     *        Temp High Alarm Bit-7
+     *        Temp Low  Alarm Bit-6
+     *	      Vcc High  Alarm Bit-5
+	 *        Vcc Low   Alarm Bit-4
+	 *        Tx Bias   Alarm Bit-3
+	 *        Tx Bias   Alarm Bit-2
+	 *        Tx Power  Alarm Bit-1
+	 *        Tx Power  Alarm Bit-0
+	 */
+	return snprintf(buf_p, limt, "%d\n", get_bit( self->alarm_flag_byte_1 ,3));
+
+}
+
+int
+sfp_get_bias_low_alarm(struct transvr_obj_s *self,
+                     char *buf_p) {
+
+    int limt = 8;
+    int err_code = DEBUG_TRANSVR_INT_VAL;
+
+    err_code = _check_by_mode(self,
+                              &_sfp_update_attr_alarm_flag_byte_1,
+                              "sfp_get_bias_low_alarm");
+    if (err_code < 0) {
+        return snprintf(buf_p, limt, "%d\n", err_code);
+    }
+    if ( self->alarm_flag_byte_1 == DEBUG_TRANSVR_HEX_VAL ) {
+        return snprintf(buf_p, limt, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* [Prop]: SFP Alarm Flag bit
+     * [Desc]: SFP Alarm Flag bit
+     * [Note]: SFP+/28 => SFF-8472 A2H Byte-112
+     *        Temp High Alarm Bit-7
+     *        Temp Low  Alarm Bit-6
+     *	      Vcc High  Alarm Bit-5
+	 *        Vcc Low   Alarm Bit-4
+	 *        Tx Bias   Alarm Bit-3
+	 *        Tx Bias   Alarm Bit-2
+	 *        Tx Power  Alarm Bit-1
+	 *        Tx Power  Alarm Bit-0
+	 */
+	return snprintf(buf_p, limt, "%d\n", get_bit( self->alarm_flag_byte_1 ,2));
+
+}
+
+int
+sfp_get_tx_power_high_alarm(struct transvr_obj_s *self,
+                     char *buf_p) {
+
+    int limt = 8;
+    int err_code = DEBUG_TRANSVR_INT_VAL;
+
+    err_code = _check_by_mode(self,
+                              &_sfp_update_attr_alarm_flag_byte_1,
+                              "sfp_get_tx_power_high_alarm");
+    if (err_code < 0) {
+        return snprintf(buf_p, limt, "%d\n", err_code);
+    }
+    if ( self->alarm_flag_byte_1 == DEBUG_TRANSVR_HEX_VAL ) {
+        return snprintf(buf_p, limt, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* [Prop]: SFP Alarm Flag bit
+     * [Desc]: SFP Alarm Flag bit
+     * [Note]: SFP+/28 => SFF-8472 A2H Byte-112
+     *        Temp High Alarm Bit-7
+     *        Temp Low  Alarm Bit-6
+     *	      Vcc High  Alarm Bit-5
+	 *        Vcc Low   Alarm Bit-4
+	 *        Tx Bias   Alarm Bit-3
+	 *        Tx Bias   Alarm Bit-2
+	 *        Tx Power  Alarm Bit-1
+	 *        Tx Power  Alarm Bit-0
+	 */
+	return snprintf(buf_p, limt, "%d\n", get_bit( self->alarm_flag_byte_1 ,1));
+
+}
+
+int
+sfp_get_tx_power_low_alarm(struct transvr_obj_s *self,
+                     char *buf_p) {
+
+    int limt = 8;
+    int err_code = DEBUG_TRANSVR_INT_VAL;
+
+    err_code = _check_by_mode(self,
+                              &_sfp_update_attr_alarm_flag_byte_1,
+                              "sfp_get_tx_power_low_alarm");
+    if (err_code < 0) {
+        return snprintf(buf_p, limt, "%d\n", err_code);
+    }
+    if ( self->alarm_flag_byte_1 == DEBUG_TRANSVR_HEX_VAL ) {
+        return snprintf(buf_p, limt, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* [Prop]: SFP Alarm Flag bit
+     * [Desc]: SFP Alarm Flag bit
+     * [Note]: SFP+/28 => SFF-8472 A2H Byte-112
+     *        Temp High Alarm Bit-7
+     *        Temp Low  Alarm Bit-6
+     *	      Vcc High  Alarm Bit-5
+	 *        Vcc Low   Alarm Bit-4
+	 *        Tx Bias   Alarm Bit-3
+	 *        Tx Bias   Alarm Bit-2
+	 *        Tx Power  Alarm Bit-1
+	 *        Tx Power  Alarm Bit-0
+	 */
+	return snprintf(buf_p, limt, "%d\n", get_bit( self->alarm_flag_byte_1 ,0));
+
+}
+
+int
+sfp_get_rx_power_high_alarm(struct transvr_obj_s *self,
+                     char *buf_p) {
+
+    int limt = 8;
+    int err_code = DEBUG_TRANSVR_INT_VAL;
+
+    err_code = _check_by_mode(self,
+                              &_sfp_update_attr_alarm_flag_byte_2,
+                              "sfp_get_rx_power_high_alarm");
+    if (err_code < 0) {
+        return snprintf(buf_p, limt, "%d\n", err_code);
+    }
+    if ( self->alarm_flag_byte_2 == DEBUG_TRANSVR_HEX_VAL ) {
+        return snprintf(buf_p, limt, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* [Prop]: SFP Alarm Flag bit
+     * [Desc]: SFP Alarm Flag bit
+     * [Note]: SFP+/28 => SFF-8472 A2H Byte-113
+	 *        Rx Power Alarm Bit-7
+	 *        Rx Power Alarm Bit-6
+     */
+	return snprintf(buf_p, limt, "%d\n", get_bit( self->alarm_flag_byte_2 ,7));
+
+}
+
+int
+sfp_get_rx_power_low_alarm(struct transvr_obj_s *self,
+                     char *buf_p) {
+
+    int limt = 8;
+    int err_code = DEBUG_TRANSVR_INT_VAL;
+
+    err_code = _check_by_mode(self,
+                              &_sfp_update_attr_alarm_flag_byte_2,
+                              "sfp_get_rx_power_low_alarm");
+    if (err_code < 0) {
+        return snprintf(buf_p, limt, "%d\n", err_code);
+    }
+    if ( self->alarm_flag_byte_2 == DEBUG_TRANSVR_HEX_VAL ) {
+        return snprintf(buf_p, limt, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* [Prop]: SFP Alarm Flag bit
+     * [Desc]: SFP Alarm Flag bit
+     * [Note]: SFP+/28 => SFF-8472 A2H Byte-113
+	 *        Rx Power Alarm Bit-7
+	 *        Rx Power Alarm Bit-6
+     */
+	return snprintf(buf_p, limt, "%d\n", get_bit( self->alarm_flag_byte_2 ,6));
+
+}
+
+int
+sfp_get_temp_high_alarm_threshold(struct transvr_obj_s *self,
+                     char *buf_p) {
+
+    int lmax = 8;
+    int err_code = DEBUG_TRANSVR_INT_VAL;
+
+    err_code = _check_by_mode(self,
+                              &_sfp_update_attr_temp_high_alarm_threshold,
+                              "sfp_get_temp_high_alarm_threshold");
+    if (err_code < 0) {
+        return snprintf(buf_p, lmax, "%d\n", err_code);
+    }
+    if ((self->temp_high_alarm_threshold[0]) == DEBUG_TRANSVR_HEX_VAL) {
+        return snprintf(buf_p, lmax, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    return _common_count_temp(self->temp_high_alarm_threshold[0],
+                              self->temp_high_alarm_threshold[1],
+                              buf_p);
+}
+
+int
+sfp_get_temp_low_alarm_threshold(struct transvr_obj_s *self,
+                     char *buf_p) {
+
+    int lmax = 8;
+    int err_code = DEBUG_TRANSVR_INT_VAL;
+
+    err_code = _check_by_mode(self,
+                              &_sfp_update_attr_temp_low_alarm_threshold,
+                              "sfp_get_temp_low_alarm_threshold");
+    if (err_code < 0) {
+        return snprintf(buf_p, lmax, "%d\n", err_code);
+    }
+    if ((self->temp_low_alarm_threshold[0]) == DEBUG_TRANSVR_HEX_VAL) {
+        return snprintf(buf_p, lmax, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    return _common_count_temp(self->temp_low_alarm_threshold[0],
+                              self->temp_low_alarm_threshold[1],
+                              buf_p);
+}
+
+int
+sfp_get_voltage_high_alarm_threshold(struct transvr_obj_s *self,
+                        char *buf_p) {
+
+    int lmax = 8;
+    int err_code = DEBUG_TRANSVR_INT_VAL;
+
+    err_code = _check_by_mode(self,
+                              &_sfp_update_attr_voltage_high_alarm_threshold,
+                              "sfp_get_voltage_high_alarm_threshold");
+    if (err_code < 0) {
+        return snprintf(buf_p, lmax, "%d\n", err_code);
+    }
+    if ((self->voltage_high_alarm_threshold[0]) == DEBUG_TRANSVR_HEX_VAL) {
+        return snprintf(buf_p, lmax, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* Return Unit: 1 Volt */
+    return _common_count_voltage(self->voltage_high_alarm_threshold[0],
+                                 self->voltage_high_alarm_threshold[1],
+                                 buf_p);
+}
+
+int
+sfp_get_voltage_low_alarm_threshold(struct transvr_obj_s *self,
+                        char *buf_p) {
+
+    int lmax = 8;
+    int err_code = DEBUG_TRANSVR_INT_VAL;
+
+    err_code = _check_by_mode(self,
+                              &_sfp_update_attr_voltage_low_alarm_threshold,
+                              "sfp_get_voltage_low_alarm_threshold");
+    if (err_code < 0) {
+        return snprintf(buf_p, lmax, "%d\n", err_code);
+    }
+    if ((self->voltage_low_alarm_threshold[0]) == DEBUG_TRANSVR_HEX_VAL) {
+        return snprintf(buf_p, lmax, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* Return Unit: 1 Volt */
+    return _common_count_voltage(self->voltage_low_alarm_threshold[0],
+                                 self->voltage_low_alarm_threshold[1],
+                                 buf_p);
+}
+
+int
+sfp_get_bias_high_alarm_threshold(struct transvr_obj_s *self,
+                        char *buf_p) {
+
+    int lmax = 8;
+    int err_code = DEBUG_TRANSVR_INT_VAL;
+
+    err_code = _check_by_mode(self,
+                              &_sfp_update_attr_bias_high_alarm_threshold,
+                              "sfp_get_bias_high_alarm_threshold");
+    if (err_code < 0) {
+        return snprintf(buf_p, lmax, "%d\n", err_code);
+    }
+    if ((self->bias_high_alarm_threshold[0]) == DEBUG_TRANSVR_HEX_VAL) {
+        return snprintf(buf_p, lmax, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* Return Unit: 1 mA */
+    return _common_count_tx_bias(self->bias_high_alarm_threshold[0],
+                                 self->bias_high_alarm_threshold[1],
+                                 buf_p);
+}
+
+int
+sfp_get_bias_low_alarm_threshold(struct transvr_obj_s *self,
+                        char *buf_p) {
+
+    int lmax = 8;
+    int err_code = DEBUG_TRANSVR_INT_VAL;
+
+    err_code = _check_by_mode(self,
+                              &_sfp_update_attr_bias_low_alarm_threshold,
+                              "sfp_get_bias_low_alarm_threshold");
+    if (err_code < 0) {
+        return snprintf(buf_p, lmax, "%d\n", err_code);
+    }
+    if ((self->bias_low_alarm_threshold[0]) == DEBUG_TRANSVR_HEX_VAL) {
+        return snprintf(buf_p, lmax, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* Return Unit: 1 mA */
+    return _common_count_tx_bias(self->bias_low_alarm_threshold[0],
+                                 self->bias_low_alarm_threshold[1],
+                                 buf_p);
+}
+
+int
+sfp_get_tx_power_high_alarm_threshold(struct transvr_obj_s *self,
+                         char *buf_p) {
+
+    int lmax = 8;
+    int err_code = DEBUG_TRANSVR_INT_VAL;
+
+    err_code = _check_by_mode(self,
+                              &_sfp_update_attr_tx_power_high_alarm_threshold,
+                              "sfp_get_tx_power_high_alarm_threshold");
+    if (err_code < 0) {
+        return snprintf(buf_p, lmax, "%d\n", err_code);
+    }
+    if ((self->tx_power_high_alarm_threshold[0]) == DEBUG_TRANSVR_HEX_VAL) {
+        return snprintf(buf_p, lmax, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* Return Unit: 1 mW */
+    return _common_count_tx_power(self->tx_power_high_alarm_threshold[0],
+                                  self->tx_power_high_alarm_threshold[1],
+                                  buf_p);
+}
+
+int
+sfp_get_tx_power_low_alarm_threshold(struct transvr_obj_s *self,
+                         char *buf_p) {
+
+    int lmax = 8;
+    int err_code = DEBUG_TRANSVR_INT_VAL;
+
+    err_code = _check_by_mode(self,
+                              &_sfp_update_attr_tx_power_low_alarm_threshold,
+                              "sfp_get_tx_power_low_alarm_threshold");
+    if (err_code < 0) {
+        return snprintf(buf_p, lmax, "%d\n", err_code);
+    }
+    if ((self->tx_power_low_alarm_threshold[0]) == DEBUG_TRANSVR_HEX_VAL) {
+        return snprintf(buf_p, lmax, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* Return Unit: 1 mW */
+    return _common_count_tx_power(self->tx_power_low_alarm_threshold[0],
+                                  self->tx_power_low_alarm_threshold[1],
+                                  buf_p);
+}
+
+int
+sfp_get_rx_power_high_alarm_threshold(struct transvr_obj_s *self,
+                         char *buf_p) {
+
+    int lmax = 8;
+    int err_code = DEBUG_TRANSVR_INT_VAL;
+
+    err_code = _check_by_mode(self,
+                              &_sfp_update_attr_rx_power_high_alarm_threshold,
+                              "sfp_get_rx_power_high_alarm_threshold");
+    if (err_code < 0) {
+        return snprintf(buf_p, lmax, "%d\n", err_code);
+    }
+    if ((self->rx_power_high_alarm_threshold[0]) == DEBUG_TRANSVR_HEX_VAL) {
+        return snprintf(buf_p, lmax, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* Return Unit: 1 mW */
+    return _common_count_rx_power(self->rx_power_high_alarm_threshold[0],
+                                  self->rx_power_high_alarm_threshold[1],
+                                  buf_p);
+}
+
+int
+sfp_get_rx_power_low_alarm_threshold(struct transvr_obj_s *self,
+                         char *buf_p) {
+
+    int lmax = 8;
+    int err_code = DEBUG_TRANSVR_INT_VAL;
+
+    err_code = _check_by_mode(self,
+                              &_sfp_update_attr_rx_power_low_alarm_threshold,
+                              "sfp_get_rx_power_low_alarm_threshold");
+    if (err_code < 0) {
+        return snprintf(buf_p, lmax, "%d\n", err_code);
+    }
+    if ((self->rx_power_low_alarm_threshold[0]) == DEBUG_TRANSVR_HEX_VAL) {
+        return snprintf(buf_p, lmax, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* Return Unit: 1 mW */
+    return _common_count_rx_power(self->rx_power_low_alarm_threshold[0],
+                                  self->rx_power_low_alarm_threshold[1],
+                                  buf_p);
+}
 
 int
 __qsfp_get_power_cls(struct transvr_obj_s *self,
@@ -2491,6 +3682,21 @@ qsfp_get_power_cls(struct transvr_obj_s *self) {
     return __qsfp_get_power_cls(self, 1);
 }
 
+int
+qsfp_get_eeprom_page03(struct transvr_obj_s *self, char *buf){
+
+    int err = DEBUG_TRANSVR_INT_VAL;
+
+    err = _check_by_mode(self,
+                         &_qsfp_update_attr_eeprom_page03,
+                         "qsfp_get_eeprom_page03");
+    if (err < 0){
+        return snprintf(buf, LEN_TRANSVR_M_STR, "%d\n", err);
+    }
+    memset(buf, 0, self->eeprom_map_p->length_eeprom_page03);
+    memcpy(buf, self->eeprom_page03, self->eeprom_map_p->length_eeprom_page03);
+    return self->eeprom_map_p->length_eeprom_page03;
+}
 
 int
 __qsfp_get_cdr_present(struct transvr_obj_s *self,
@@ -3013,6 +4219,561 @@ qsfp_get_transvr_rx_power(struct transvr_obj_s *self,
                                   buf_p);
 }
 
+int
+qsfp_get_temp_high_alarm_threshold(struct transvr_obj_s *self,
+                     char *buf_p) {
+
+    int lmax = 8;
+    int err_code = DEBUG_TRANSVR_INT_VAL;
+
+    err_code = _check_by_mode(self,
+                              &_qsfp_update_attr_temp_high_alarm_threshold,
+                              "qsfp_get_temp_high_alarm_threshold");
+    if (err_code < 0) {
+        return snprintf(buf_p, lmax, "%d\n", err_code);
+    }
+    if ((self->temp_high_alarm_threshold[0]) == DEBUG_TRANSVR_HEX_VAL) {
+        return snprintf(buf_p, lmax, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    return _common_count_temp(self->temp_high_alarm_threshold[0],
+                              self->temp_high_alarm_threshold[1],
+                              buf_p);
+}
+
+int
+qsfp_get_temp_low_alarm_threshold(struct transvr_obj_s *self,
+                     char *buf_p) {
+
+    int lmax = 8;
+    int err_code = DEBUG_TRANSVR_INT_VAL;
+
+    err_code = _check_by_mode(self,
+                              &_qsfp_update_attr_temp_low_alarm_threshold,
+                              "qsfp_get_temp_low_alarm_threshold");
+    if (err_code < 0) {
+        return snprintf(buf_p, lmax, "%d\n", err_code);
+    }
+    if ((self->temp_low_alarm_threshold[0]) == DEBUG_TRANSVR_HEX_VAL) {
+        return snprintf(buf_p, lmax, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    return _common_count_temp(self->temp_low_alarm_threshold[0],
+                              self->temp_low_alarm_threshold[1],
+                              buf_p);
+}
+
+int
+qsfp_get_voltage_high_alarm_threshold(struct transvr_obj_s *self,
+                         char *buf_p) {
+
+    int lmax = 8;
+    int err_code = DEBUG_TRANSVR_INT_VAL;
+
+    err_code = _check_by_mode(self,
+                              &_qsfp_update_attr_voltage_high_alarm_threshold,
+                              "qsfp_get_voltage_high_alarm_threshold");
+    if (err_code < 0) {
+        return snprintf(buf_p, lmax, "%d\n", err_code);
+    }
+    if ((self->voltage_high_alarm_threshold[0]) == DEBUG_TRANSVR_HEX_VAL) {
+        return snprintf(buf_p, lmax, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* Return Unit: 1 Volt */
+    return _common_count_voltage(self->voltage_high_alarm_threshold[0],
+                                 self->voltage_high_alarm_threshold[1],
+                                 buf_p);
+}
+
+int
+qsfp_get_voltage_low_alarm_threshold(struct transvr_obj_s *self,
+                         char *buf_p) {
+
+    int lmax = 8;
+    int err_code = DEBUG_TRANSVR_INT_VAL;
+
+    err_code = _check_by_mode(self,
+                              &_qsfp_update_attr_voltage_low_alarm_threshold,
+                              "qsfp_get_voltage_low_alarm_threshold");
+    if (err_code < 0) {
+        return snprintf(buf_p, lmax, "%d\n", err_code);
+    }
+    if ((self->voltage_low_alarm_threshold[0]) == DEBUG_TRANSVR_HEX_VAL) {
+        return snprintf(buf_p, lmax, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* Return Unit: 1 Volt */
+    return _common_count_voltage(self->voltage_low_alarm_threshold[0],
+                                 self->voltage_low_alarm_threshold[1],
+                                 buf_p);
+}
+
+int
+qsfp_get_bias_low_alarm_threshold(struct transvr_obj_s *self,
+                         char *buf_p) {
+
+    int lmax      = 8;
+    int err_code  = DEBUG_TRANSVR_INT_VAL;
+    char *ch_name = "TX";
+
+    err_code = _check_by_mode(self,
+                              &_qsfp_update_attr_bias_low_alarm_threshold,
+                              "qsfp_get_bias_low_alarm_threshold");
+    if (err_code < 0) {
+        return snprintf(buf_p, lmax, "%d\n", err_code);
+    }
+    if ((self->bias_low_alarm_threshold[0]) == DEBUG_TRANSVR_HEX_VAL) {
+        return snprintf(buf_p, lmax, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* Return Unit: 1 mA */
+    return _common_count_tx_bias(self->bias_low_alarm_threshold[0],
+                                 self->bias_low_alarm_threshold[1],
+                                 buf_p);
+}
+
+int
+qsfp_get_bias_high_alarm_threshold(struct transvr_obj_s *self,
+                         char *buf_p) {
+
+    int lmax      = 8;
+    int err_code  = DEBUG_TRANSVR_INT_VAL;
+    char *ch_name = "TX";
+
+    err_code = _check_by_mode(self,
+                              &_qsfp_update_attr_bias_high_alarm_threshold,
+                              "qsfp_get_bias_high_alarm_threshold");
+    if (err_code < 0) {
+        return snprintf(buf_p, lmax, "%d\n", err_code);
+    }
+    if ((self->bias_high_alarm_threshold[0]) == DEBUG_TRANSVR_HEX_VAL) {
+        return snprintf(buf_p, lmax, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* Return Unit: 1 mA */
+    return _common_count_tx_bias(self->bias_high_alarm_threshold[0],
+                                 self->bias_high_alarm_threshold[1],
+                                 buf_p);
+}
+
+int
+qsfp_get_tx_power_low_alarm_threshold(struct transvr_obj_s *self,
+                          char *buf_p) {
+
+    int lmax      = 8;
+    int err_code  = DEBUG_TRANSVR_INT_VAL;
+    char *ch_name = "TX";
+
+    err_code = _check_by_mode(self,
+                              &_qsfp_update_attr_tx_power_low_alarm_threshold,
+                              "qsfp_get_tx_power_low_alarm_threshold");
+    if (err_code < 0) {
+        return snprintf(buf_p, lmax, "%d\n", err_code);
+    }
+    if ((self->tx_power_low_alarm_threshold[0]) == DEBUG_TRANSVR_HEX_VAL) {
+        return snprintf(buf_p, lmax, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* Return Unit: 1 mW */
+    return _common_count_tx_power(self->tx_power_low_alarm_threshold[0],
+                                  self->tx_power_low_alarm_threshold[1],
+                                  buf_p);
+}
+
+int
+qsfp_get_tx_power_high_alarm_threshold(struct transvr_obj_s *self,
+                          char *buf_p) {
+
+    int lmax      = 8;
+    int err_code  = DEBUG_TRANSVR_INT_VAL;
+    char *ch_name = "TX";
+
+    err_code = _check_by_mode(self,
+                              &_qsfp_update_attr_tx_power_high_alarm_threshold,
+                              "qsfp_get_tx_power_high_alarm_threshold");
+    if (err_code < 0) {
+        return snprintf(buf_p, lmax, "%d\n", err_code);
+    }
+    if ((self->tx_power_high_alarm_threshold[0]) == DEBUG_TRANSVR_HEX_VAL) {
+        return snprintf(buf_p, lmax, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* Return Unit: 1 mW */
+    return _common_count_tx_power(self->tx_power_high_alarm_threshold[0],
+                                  self->tx_power_high_alarm_threshold[1],
+                                  buf_p);
+}
+
+int
+qsfp_get_rx_power_low_alarm_threshold(struct transvr_obj_s *self,
+                          char *buf_p) {
+
+    int lmax      = 8;
+    int err_code  = DEBUG_TRANSVR_INT_VAL;
+    char *ch_name = "RX";
+
+    err_code = _check_by_mode(self,
+                              &_qsfp_update_attr_rx_power_low_alarm_threshold,
+                              "qsfp_get_rx_power_low_alarm_threshold");
+    if (err_code < 0) {
+        return snprintf(buf_p, lmax, "%d\n", err_code);
+    }
+    if ((self->rx_power_low_alarm_threshold[0]) == DEBUG_TRANSVR_HEX_VAL) {
+        return snprintf(buf_p, lmax, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* Return Unit: 1 mW */
+    return _common_count_rx_power(self->rx_power_low_alarm_threshold[0],
+                                  self->rx_power_low_alarm_threshold[1],
+                                  buf_p);
+}
+
+int
+qsfp_get_rx_power_high_alarm_threshold(struct transvr_obj_s *self,
+                          char *buf_p) {
+
+    int lmax      = 8;
+    int err_code  = DEBUG_TRANSVR_INT_VAL;
+    char *ch_name = "RX";
+
+    err_code = _check_by_mode(self,
+                              &_qsfp_update_attr_rx_power_high_alarm_threshold,
+                              "qsfp_get_rx_power_high_alarm_threshold");
+    if (err_code < 0) {
+        return snprintf(buf_p, lmax, "%d\n", err_code);
+    }
+    if ((self->rx_power_high_alarm_threshold[0]) == DEBUG_TRANSVR_HEX_VAL) {
+        return snprintf(buf_p, lmax, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* Return Unit: 1 mW */
+    return _common_count_rx_power(self->rx_power_high_alarm_threshold[0],
+                                  self->rx_power_high_alarm_threshold[1],
+                                  buf_p);
+}
+
+int
+qsfp_get_temp_high_alarm(struct transvr_obj_s *self,
+                     char *buf_p) {
+
+    int lmax = 8;
+    int err_code = DEBUG_TRANSVR_INT_VAL;
+
+    err_code = _check_by_mode(self,
+                              &_qsfp_update_attr_temp_alarm,
+                              "qsfp_get_temp_high_alarm");
+    if (err_code < 0) {
+        return snprintf(buf_p, lmax, "%d\n", err_code);
+    }
+    if ( self->temp_alarm == DEBUG_TRANSVR_HEX_VAL ) {
+        return snprintf(buf_p, lmax, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* [Prop]: QSFP Alarm Flag bit
+     * [Desc]: QSFP Temp Alarm Flag bit
+     * [Note]: QSFP+/28 => SFF-8636 Page 00H Byte-6
+     *        Temp High Alarm Bit-7
+     *        Temp Low  Alarm Bit-6
+	 */
+	return snprintf(buf_p, lmax, "%d\n", get_bit( self->temp_alarm ,7));
+
+}
+
+int
+qsfp_get_temp_low_alarm(struct transvr_obj_s *self,
+                     char *buf_p) {
+
+    int lmax = 8;
+    int err_code = DEBUG_TRANSVR_INT_VAL;
+
+    err_code = _check_by_mode(self,
+                              &_qsfp_update_attr_temp_alarm,
+                              "qsfp_get_temp_low_alarm");
+    if (err_code < 0) {
+        return snprintf(buf_p, lmax, "%d\n", err_code);
+    }
+    if ( self->temp_alarm == DEBUG_TRANSVR_HEX_VAL ) {
+        return snprintf(buf_p, lmax, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* [Prop]: QSFP Alarm Flag bit
+     * [Desc]: QSFP Temp Alarm Flag bit
+     * [Note]: QSFP+/28 => SFF-8636 Page 00H Byte-6
+     *        Temp High Alarm Bit-7
+     *        Temp Low  Alarm Bit-6
+	 */
+	return snprintf(buf_p, lmax, "%d\n", get_bit( self->temp_alarm ,6));
+
+}
+
+int
+qsfp_get_voltage_high_alarm(struct transvr_obj_s *self,
+                     char *buf_p) {
+
+    int lmax = 8;
+    int err_code = DEBUG_TRANSVR_INT_VAL;
+
+    err_code = _check_by_mode(self,
+                              &_qsfp_update_attr_voltage_alarm,
+                              "qsfp_get_voltage_high_alarm");
+    if (err_code < 0) {
+        return snprintf(buf_p, lmax, "%d\n", err_code);
+    }
+    if ( self->voltage_alarm == DEBUG_TRANSVR_HEX_VAL ) {
+        return snprintf(buf_p, lmax, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* [Prop]: QSFP Alarm Flag bit
+     * [Desc]: QSFP voltage Alarm Flag bit
+     * [Note]: QSFP+/28 => SFF-8636 Page 00H Byte-7
+     *        voltage High Alarm Bit-7
+     *        voltage Low  Alarm Bit-6
+	 */
+	return snprintf(buf_p, lmax, "%d\n", get_bit( self->voltage_alarm ,7));
+
+}
+
+int
+qsfp_get_voltage_low_alarm(struct transvr_obj_s *self,
+                     char *buf_p) {
+
+    int lmax = 8;
+    int err_code = DEBUG_TRANSVR_INT_VAL;
+
+    err_code = _check_by_mode(self,
+                              &_qsfp_update_attr_voltage_alarm,
+                              "qsfp_get_voltage_low_alarm");
+    if (err_code < 0) {
+        return snprintf(buf_p, lmax, "%d\n", err_code);
+    }
+    if ( self->voltage_alarm == DEBUG_TRANSVR_HEX_VAL ) {
+        return snprintf(buf_p, lmax, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* [Prop]: QSFP Alarm Flag bit
+     * [Desc]: QSFP voltage Alarm Flag bit
+     * [Note]: QSFP+/28 => SFF-8636 Page 00H Byte-7
+     *        voltage High Alarm Bit-7
+     *        voltage Low  Alarm Bit-6
+	 */
+	return snprintf(buf_p, lmax, "%d\n", get_bit( self->voltage_alarm ,6));
+
+}
+
+int
+qsfp_get_rx_power_high_alarm(struct transvr_obj_s *self,
+                     char *buf_p) {
+
+    int lmax = 8;
+    int len_max = 128;
+    int err_code = DEBUG_TRANSVR_INT_VAL;
+    char *ch_name = "RX";
+
+    err_code = _check_by_mode(self,
+                              &_qsfp_update_attr_rx_power_alarm,
+                              "qsfp_get_rx_power_high_alarm");
+    if (err_code < 0) {
+        return snprintf(buf_p, lmax, "%d\n", err_code);
+    }
+    if ((self->rx_power_alarm[0]) == DEBUG_TRANSVR_HEX_VAL) {
+        return snprintf(buf_p, lmax, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* [Prop]: QSFP Alarm Flag bit
+     * [Desc]: QSFP RX Power Alarm Flag bit
+     * [Note]: QSFP+/28 => SFF-8636 Page 00H Byte-9~10
+     *        RX1 Power High Alarm Byte-9  Bit-7
+     *        RX1 Power Low  Alarm Byte-9  Bit-6
+     *        RX2 Power High Alarm Byte-9  Bit-3
+     *        RX2 Power Low  Alarm Byte-9  Bit-2
+     *        RX3 Power High Alarm Byte-10 Bit-7
+     *        RX3 Power Low  Alarm Byte-10 Bit-6
+     *        RX4 Power High Alarm Byte-10 Bit-3
+     *        RX4 Power Low  Alarm Byte-10 Bit-2
+	 */
+	return snprintf(buf_p, len_max, "%s-%d:%d\n%s-%d:%d\n%s-%d:%d\n%s-%d:%d\n",
+                    ch_name, 1, get_bit( self->rx_power_alarm[0] ,7),
+                    ch_name, 2, get_bit( self->rx_power_alarm[0] ,3),
+                    ch_name, 3, get_bit( self->rx_power_alarm[1] ,7),
+                    ch_name, 4, get_bit( self->rx_power_alarm[1] ,3));
+
+}
+
+int
+qsfp_get_rx_power_low_alarm(struct transvr_obj_s *self,
+                     char *buf_p) {
+
+    int lmax = 8;
+    int len_max = 128;
+    int err_code = DEBUG_TRANSVR_INT_VAL;
+    char *ch_name = "RX";
+
+    err_code = _check_by_mode(self,
+                              &_qsfp_update_attr_rx_power_alarm,
+                              "qsfp_get_rx_power_low_alarm");
+    if (err_code < 0) {
+        return snprintf(buf_p, lmax, "%d\n", err_code);
+    }
+    if ((self->rx_power_alarm[0]) == DEBUG_TRANSVR_HEX_VAL) {
+        return snprintf(buf_p, lmax, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* [Prop]: QSFP Alarm Flag bit
+     * [Desc]: QSFP RX Power Alarm Flag bit
+     * [Note]: QSFP+/28 => SFF-8636 Page 00H Byte-9~10
+     *        RX1 Power High Alarm Byte-9  Bit-7
+     *        RX1 Power Low  Alarm Byte-9  Bit-6
+     *        RX2 Power High Alarm Byte-9  Bit-3
+     *        RX2 Power Low  Alarm Byte-9  Bit-2
+     *        RX3 Power High Alarm Byte-10 Bit-7
+     *        RX3 Power Low  Alarm Byte-10 Bit-6
+     *        RX4 Power High Alarm Byte-10 Bit-3
+     *        RX4 Power Low  Alarm Byte-10 Bit-2
+	 */
+	return snprintf(buf_p, len_max, "%s-%d:%d\n%s-%d:%d\n%s-%d:%d\n%s-%d:%d\n",
+                    ch_name, 1, get_bit( self->rx_power_alarm[0] ,6),
+                    ch_name, 2, get_bit( self->rx_power_alarm[0] ,2),
+                    ch_name, 3, get_bit( self->rx_power_alarm[1] ,6),
+                    ch_name, 4, get_bit( self->rx_power_alarm[1] ,2));
+
+}
+
+int
+qsfp_get_bias_high_alarm(struct transvr_obj_s *self,
+                     char *buf_p) {
+
+    int lmax = 8;
+    int len_max = 128;
+    int err_code = DEBUG_TRANSVR_INT_VAL;
+    char *ch_name = "TX";
+
+    err_code = _check_by_mode(self,
+                              &_qsfp_update_attr_rx_power_alarm,
+                              "qsfp_get_bias_high_alarm");
+    if (err_code < 0) {
+        return snprintf(buf_p, lmax, "%d\n", err_code);
+    }
+    if ((self->bias_alarm[0]) == DEBUG_TRANSVR_HEX_VAL) {
+        return snprintf(buf_p, lmax, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* [Prop]: QSFP Alarm Flag bit
+     * [Desc]: QSFP TX bias Alarm Flag bit
+     * [Note]: QSFP+/28 => SFF-8636 Page 00H Byte-11~12
+     *        TX1 bias High Alarm Byte-11 Bit-7
+     *        TX1 bias Low  Alarm Byte-11 Bit-6
+     *        TX2 bias High Alarm Byte-11 Bit-3
+     *        TX2 bias Low  Alarm Byte-11 Bit-2
+     *        TX3 bias High Alarm Byte-12 Bit-7
+     *        TX3 bias Low  Alarm Byte-12 Bit-6
+     *        TX4 bias High Alarm Byte-12 Bit-3
+     *        TX4 bias Low  Alarm Byte-12 Bit-2
+	 */
+	return snprintf(buf_p, len_max, "%s-%d:%d\n%s-%d:%d\n%s-%d:%d\n%s-%d:%d\n",
+                    ch_name, 1, get_bit( self->bias_alarm[0] ,7),
+                    ch_name, 2, get_bit( self->bias_alarm[0] ,3),
+                    ch_name, 3, get_bit( self->bias_alarm[1] ,7),
+                    ch_name, 4, get_bit( self->bias_alarm[1] ,3));
+
+}
+
+int
+qsfp_get_bias_low_alarm(struct transvr_obj_s *self,
+                     char *buf_p) {
+
+    int lmax = 8;
+    int len_max = 128;
+    int err_code = DEBUG_TRANSVR_INT_VAL;
+    char *ch_name = "TX";
+
+    err_code = _check_by_mode(self,
+                              &_qsfp_update_attr_rx_power_alarm,
+                              "qsfp_get_bias_low_alarm");
+    if (err_code < 0) {
+        return snprintf(buf_p, lmax, "%d\n", err_code);
+    }
+    if ((self->bias_alarm[0]) == DEBUG_TRANSVR_HEX_VAL) {
+        return snprintf(buf_p, lmax, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* [Prop]: QSFP Alarm Flag bit
+     * [Desc]: QSFP TX bias Alarm Flag bit
+     * [Note]: QSFP+/28 => SFF-8636 Page 00H Byte-11~12
+     *        TX1 bias High Alarm Byte-11 Bit-7
+     *        TX1 bias Low  Alarm Byte-11 Bit-6
+     *        TX2 bias High Alarm Byte-11 Bit-3
+     *        TX2 bias Low  Alarm Byte-11 Bit-2
+     *        TX3 bias High Alarm Byte-12 Bit-7
+     *        TX3 bias Low  Alarm Byte-12 Bit-6
+     *        TX4 bias High Alarm Byte-12 Bit-3
+     *        TX4 bias Low  Alarm Byte-12 Bit-2
+	 */
+	return snprintf(buf_p, len_max, "%s-%d:%d\n%s-%d:%d\n%s-%d:%d\n%s-%d:%d\n",
+                    ch_name, 1, get_bit( self->bias_alarm[0] ,6),
+                    ch_name, 2, get_bit( self->bias_alarm[0] ,2),
+                    ch_name, 3, get_bit( self->bias_alarm[1] ,6),
+                    ch_name, 4, get_bit( self->bias_alarm[1] ,2));
+
+}
+
+int
+qsfp_get_tx_power_high_alarm(struct transvr_obj_s *self,
+                     char *buf_p) {
+
+    int lmax = 8;
+    int len_max = 128;
+    int err_code = DEBUG_TRANSVR_INT_VAL;
+    char *ch_name = "TX";
+
+    err_code = _check_by_mode(self,
+                              &_qsfp_update_attr_tx_power_alarm,
+                              "qsfp_get_tx_power_high_alarm");
+    if (err_code < 0) {
+        return snprintf(buf_p, lmax, "%d\n", err_code);
+    }
+    if ((self->tx_power_alarm[0]) == DEBUG_TRANSVR_HEX_VAL) {
+        return snprintf(buf_p, lmax, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* [Prop]: QSFP Alarm Flag bit
+     * [Desc]: QSFP TX Power Alarm Flag bit
+     * [Note]: QSFP+/28 => SFF-8636 Page 00H Byte-13~14
+     *        TX1 Power High Alarm Byte-13 Bit-7
+     *        TX1 Power Low  Alarm Byte-13 Bit-6
+     *        TX2 Power High Alarm Byte-13 Bit-3
+     *        TX2 Power Low  Alarm Byte-13 Bit-2
+     *        TX3 Power High Alarm Byte-14 Bit-7
+     *        TX3 Power Low  Alarm Byte-14 Bit-6
+     *        TX4 Power High Alarm Byte-14 Bit-3
+     *        TX4 Power Low  Alarm Byte-14 Bit-2
+	 */
+	return snprintf(buf_p, len_max, "%s-%d:%d\n%s-%d:%d\n%s-%d:%d\n%s-%d:%d\n",
+                    ch_name, 1, get_bit( self->tx_power_alarm[0] ,7),
+                    ch_name, 2, get_bit( self->tx_power_alarm[0] ,3),
+                    ch_name, 3, get_bit( self->tx_power_alarm[1] ,7),
+                    ch_name, 4, get_bit( self->tx_power_alarm[1] ,3));
+
+}
+
+int
+qsfp_get_tx_power_low_alarm(struct transvr_obj_s *self,
+                     char *buf_p) {
+
+    int lmax = 8;
+    int len_max = 128;
+    int err_code = DEBUG_TRANSVR_INT_VAL;
+    char *ch_name = "TX";
+
+    err_code = _check_by_mode(self,
+                              &_qsfp_update_attr_tx_power_alarm,
+                              "qsfp_get_tx_power_low_alarm");
+    if (err_code < 0) {
+        return snprintf(buf_p, lmax, "%d\n", err_code);
+    }
+    if ((self->tx_power_alarm[0]) == DEBUG_TRANSVR_HEX_VAL) {
+        return snprintf(buf_p, lmax, "%d\n", ERR_TRANSVR_UPDATE_FAIL);
+    }
+    /* [Prop]: QSFP Alarm Flag bit
+     * [Desc]: QSFP TX Power Alarm Flag bit
+     * [Note]: QSFP+/28 => SFF-8636 Page 00H Byte-13~14
+     *        TX1 Power High Alarm Byte-13 Bit-7
+     *        TX1 Power Low  Alarm Byte-13 Bit-6
+     *        TX2 Power High Alarm Byte-13 Bit-3
+     *        TX2 Power Low  Alarm Byte-13 Bit-2
+     *        TX3 Power High Alarm Byte-14 Bit-7
+     *        TX3 Power Low  Alarm Byte-14 Bit-6
+     *        TX4 Power High Alarm Byte-14 Bit-3
+     *        TX4 Power Low  Alarm Byte-14 Bit-2
+	 */
+	return snprintf(buf_p, len_max, "%s-%d:%d\n%s-%d:%d\n%s-%d:%d\n%s-%d:%d\n",
+                    ch_name, 1, get_bit( self->tx_power_alarm[0] ,6),
+                    ch_name, 2, get_bit( self->tx_power_alarm[0] ,2),
+                    ch_name, 3, get_bit( self->tx_power_alarm[1] ,6),
+                    ch_name, 4, get_bit( self->tx_power_alarm[1] ,2));
+
+}
 
 int
 qsfp_get_wavelength(struct transvr_obj_s *self,
@@ -4327,9 +6088,14 @@ main_transvr_task_wait:
     return EVENT_TRANSVR_TASK_WAIT;
 
 main_transvr_task_err:
-    task_p->state = STATE_T_TASK_FAIL;
-    SWPS_INFO("%s: %s <rval>:%d <port>:%s\n",
-            __func__, err_msg, retval, task_p->transvr_p->swp_name);
+    if(task_p) {
+        task_p->state = STATE_T_TASK_FAIL;
+        SWPS_INFO("%s: %s <rval>:%d <port>:%s\n",
+                __func__, err_msg, retval, task_p->transvr_p->swp_name);
+    } else {
+        SWPS_INFO("%s: %s <rval>:%d\n",
+                __func__, err_msg, retval);
+    }
     return EVENT_TRANSVR_INIT_FAIL;
 }
 
@@ -5247,7 +7013,6 @@ detect_transvr_type(struct transvr_obj_s* self){
     return type;
 }
 
-
 static int
 detect_transvr_state(struct transvr_obj_s *self,
                      int result[2]){
@@ -5272,9 +7037,19 @@ detect_transvr_state(struct transvr_obj_s *self,
         return 0;
     }
     /* Case2: Transceiver unplugged */
+    #if 0
     if (!is_plugged(self)){
         result[0] = STATE_TRANSVR_DISCONNECTED;
         result[1] = TRANSVR_TYPE_UNPLUGGED;
+        return 0;
+    }
+#endif
+
+    /* Case2: Transceiver unplugged */
+    if (!sff_io_is_plugged(self->port_id)){
+        result[0] = STATE_TRANSVR_DISCONNECTED;
+        result[1] = TRANSVR_TYPE_UNPLUGGED;
+        //SWPS_INFO("%s: %s plug out: port_id:%d\n", __func__, self->swp_name, self->port_id);
         return 0;
     }
     /* Case3: Transceiver be isolated */
@@ -5283,21 +7058,30 @@ detect_transvr_state(struct transvr_obj_s *self,
         result[1] = TRANSVR_TYPE_ERROR;
         return ERR_TRNASVR_BE_ISOLATED;
     }
-    /* Case4: Transceiver plugged */
-    result[1] = detect_transvr_type(self);
-    /* Case4.1: I2C topology crash
-     * Note   : There are some I2C issues cause by transceiver/cables.
-     *          We need to check topology status when user insert it.
-     *          But in this step, we can't not ensure this is the issues
-     *          port. So, it return the ERR_TRANSVR_I2C_CRASH, then upper
-     *          layer will diagnostic I2C topology.
-     */
-    if (check_channel_tier_1() < 0) {
-        SWPS_INFO("%s: %s detect I2C crash <obj-state>:%d\n",
-                __func__, self->swp_name, self->state);
-        result[0] = STATE_TRANSVR_UNEXCEPTED;
-        result[1] = TRANSVR_TYPE_ERROR;
-        return ERR_TRANSVR_I2C_CRASH;
+
+
+    if (STATE_TRANSVR_CONNECTED != self->state) {
+        /* Case4: Transceiver plugged */
+        result[1] = detect_transvr_type(self);
+       // SWPS_INFO("detect_type dev_name:%s port_id:%d\n", self->swp_name, self->port_id);
+        /* Case4.1: I2C topology crash
+         * Note   : There are some I2C issues cause by transceiver/cables.
+         *          We need to check topology status when user insert it.
+         *          But in this step, we can't not ensure this is the issues
+         *          port. So, it return the ERR_TRANSVR_I2C_CRASH, then upper
+         *          layer will diagnostic I2C topology.
+         */
+        if (check_channel_tier_1() < 0) {
+            SWPS_INFO("%s: %s detect I2C crash <obj-state>:%d\n",
+                    __func__, self->swp_name, self->state);
+            result[0] = STATE_TRANSVR_UNEXCEPTED;
+            result[1] = TRANSVR_TYPE_ERROR;
+            return ERR_TRANSVR_I2C_CRASH;
+        }
+    } else { /*connected case*/
+            result[0] = STATE_TRANSVR_CONNECTED;
+            return 0;
+
     }
     /* Case4.2: System initial not ready,
      * Note   : Sometime i2c channel or transceiver EEPROM will delay that will
@@ -5337,7 +7121,6 @@ detect_transvr_state(struct transvr_obj_s *self,
     result[0] = STATE_TRANSVR_CONNECTED;
     return 0;
 }
-
 
 int
 _sfp_detect_class_by_extend_comp(struct transvr_obj_s* self) {
@@ -6947,8 +8730,38 @@ check_event_happened_4_pmode:
     }
     return 0;
 }
+int transvr_health_mtr(struct transvr_obj_s* self)
+{
 
-
+    int state  = self->state;
+    int return_val = 0;
+    /*when transvr is connected , check if it's alive by accessing it at slower frequency*/
+    if (state == STATE_TRANSVR_CONNECTED)
+    {
+        //SWPS_INFO("%s: %s connected_st <obj-state>:%d detect_type_count:%d\n",
+          //      __func__, self->swp_name, self->state, detect_type_count);
+        if (self->detect_type_count++ > DETECT_TYPE_TIMEOUT) {
+            self->detect_type_count = 0;
+            return_val = detect_transvr_type(self);
+            if (TRANSVR_TYPE_ERROR == return_val ||
+                TRANSVR_TYPE_UNPLUGGED == return_val)
+            {
+                //SWPS_INFO("%s: %s sff type check fail <obj-state>:%d result:%d\n",
+                  //     __func__, self->swp_name, self->state, return_val);
+                if (check_channel_tier_1() < 0) {
+                    SWPS_INFO("%s: %s detect I2C crash <obj-state>:%d\n",
+                            __func__, self->swp_name, self->state);
+                    return ERR_TRANSVR_I2C_CRASH;
+                }
+            }
+            //SWPS_INFO("%s: %s still alive <obj-state>:%d result:%d\n",
+            //        __func__, self->swp_name, self->state, return_val);
+        }
+    } else {
+        self->detect_type_count = 0;
+    }
+    return 0;
+}
 int
 common_fsm_4_polling_mode(struct transvr_obj_s* self,
                           char *caller_name){
@@ -7215,7 +9028,6 @@ comfsm_action_4_nothing:
 comfsm_action_4_connected:
     SWPS_DEBUG("FSM action: %s Connected.\n", self->swp_name);
     self->state = STATE_TRANSVR_CONNECTED;
-    self->type  = new_type;
     self->send_uevent(self, KOBJ_ADD);
     _transvr_clean_retry(self);
     return 0;
@@ -7513,6 +9325,27 @@ err_is_transvr_hw_ready:
     return EVENT_TRANSVR_INIT_FAIL;
 }
 
+static int
+_is_transvr_support_page03(struct transvr_obj_s *self) {
+
+    switch (self->info) {
+        case TRANSVR_CLASS_OPTICAL_40G:
+        case TRANSVR_CLASS_OPTICAL_40G_AOC:
+        case TRANSVR_CLASS_OPTICAL_40G_SR4:
+        case TRANSVR_CLASS_OPTICAL_40G_LR4:
+        case TRANSVR_CLASS_OPTICAL_40G_ER4:
+        case TRANSVR_CLASS_OPTICAL_100G:
+        case TRANSVR_CLASS_OPTICAL_100G_AOC:
+        case TRANSVR_CLASS_OPTICAL_100G_SR4:
+        case TRANSVR_CLASS_OPTICAL_100G_LR4:
+        case TRANSVR_CLASS_OPTICAL_100G_ER4:
+        case TRANSVR_CLASS_OPTICAL_100G_PSM4:
+            return 1;
+        default:
+            break;
+    }
+    return 0;
+}
 
 static int
 _is_transvr_support_ctle(struct transvr_obj_s *self) {
@@ -7788,6 +9621,9 @@ setup_transvr_public_cb(struct transvr_obj_s *self,
     switch (transvr_type){
         case TRANSVR_TYPE_SFP:
             self->get_id              = common_get_id;
+            self->get_eeprom          = common_get_eeprom;
+            self->get_eeprom_a0       = sfp_get_eeprom_a0;
+            self->get_eeprom_a2       = sfp_get_eeprom_a2;
             self->get_ext_id          = common_get_ext_id;
             self->get_connector       = common_get_connector;
             self->get_vendor_name     = common_get_vendor_name;
@@ -7830,6 +9666,27 @@ setup_transvr_public_cb(struct transvr_obj_s *self,
             self->get_wavelength      = sfp_get_wavelength;
             self->get_extphy_offset   = sfp_get_1g_rj45_extphy_offset;
             self->get_extphy_reg      = sfp_get_1g_rj45_extphy_reg;
+            self->get_rx_power_low_alarm              = sfp_get_rx_power_low_alarm;
+            self->get_rx_power_high_alarm             = sfp_get_rx_power_high_alarm;
+            self->get_tx_power_low_alarm              = sfp_get_tx_power_low_alarm;
+            self->get_tx_power_high_alarm             = sfp_get_tx_power_high_alarm;
+            self->get_bias_low_alarm                  = sfp_get_bias_low_alarm;
+            self->get_bias_high_alarm                 = sfp_get_bias_high_alarm;
+            self->get_voltage_low_alarm               = sfp_get_voltage_low_alarm;
+            self->get_voltage_high_alarm              = sfp_get_voltage_high_alarm;
+            self->get_temp_low_alarm                  = sfp_get_temp_low_alarm;
+            self->get_temp_high_alarm                 = sfp_get_temp_high_alarm;
+            self->get_rx_power_low_alarm_threshold    = sfp_get_rx_power_low_alarm_threshold;
+            self->get_rx_power_high_alarm_threshold   = sfp_get_rx_power_high_alarm_threshold;
+            self->get_tx_power_low_alarm_threshold    = sfp_get_tx_power_low_alarm_threshold;
+            self->get_tx_power_high_alarm_threshold   = sfp_get_tx_power_high_alarm_threshold;
+            self->get_bias_low_alarm_threshold        = sfp_get_bias_low_alarm_threshold;
+            self->get_bias_high_alarm_threshold       = sfp_get_bias_high_alarm_threshold;
+            self->get_voltage_low_alarm_threshold     = sfp_get_voltage_low_alarm_threshold;
+            self->get_voltage_high_alarm_threshold    = sfp_get_voltage_high_alarm_threshold;
+            self->get_temp_low_alarm_threshold        = sfp_get_temp_low_alarm_threshold;
+            self->get_temp_high_alarm_threshold       = sfp_get_temp_high_alarm_threshold;
+            self->get_manufacturing_date              = common_get_manufacturing_date;
             self->set_cdr             = unsupported_set_func;
             self->set_soft_rs0        = sfp_set_soft_rs0;
             self->set_soft_rs1        = sfp_set_soft_rs1;
@@ -7845,6 +9702,8 @@ setup_transvr_public_cb(struct transvr_obj_s *self,
         case TRANSVR_TYPE_QSFP:
         case TRANSVR_TYPE_QSFP_PLUS:
             self->get_id              = common_get_id;
+            self->get_eeprom          = common_get_eeprom;
+            self->get_eeprom_page03   = qsfp_get_eeprom_page03;
             self->get_ext_id          = common_get_ext_id;
             self->get_connector       = common_get_connector;
             self->get_vendor_name     = common_get_vendor_name;
@@ -7887,6 +9746,27 @@ setup_transvr_public_cb(struct transvr_obj_s *self,
             self->get_wavelength      = qsfp_get_wavelength;
             self->get_extphy_offset   = unsupported_get_func2;
             self->get_extphy_reg      = unsupported_get_func2;
+            self->get_rx_power_low_alarm              = qsfp_get_rx_power_low_alarm;
+            self->get_rx_power_high_alarm             = qsfp_get_rx_power_high_alarm;
+            self->get_tx_power_low_alarm              = qsfp_get_tx_power_low_alarm;
+            self->get_tx_power_high_alarm             = qsfp_get_tx_power_high_alarm;
+            self->get_bias_low_alarm                  = qsfp_get_bias_low_alarm;
+            self->get_bias_high_alarm                 = qsfp_get_bias_high_alarm;
+            self->get_voltage_low_alarm               = qsfp_get_voltage_low_alarm;
+            self->get_voltage_high_alarm              = qsfp_get_voltage_high_alarm;
+            self->get_temp_low_alarm                  = qsfp_get_temp_low_alarm;
+            self->get_temp_high_alarm                 = qsfp_get_temp_high_alarm;
+            self->get_rx_power_low_alarm_threshold    = qsfp_get_rx_power_low_alarm_threshold;
+            self->get_rx_power_high_alarm_threshold   = qsfp_get_rx_power_high_alarm_threshold;
+            self->get_tx_power_low_alarm_threshold    = qsfp_get_tx_power_low_alarm_threshold;
+            self->get_tx_power_high_alarm_threshold   = qsfp_get_tx_power_high_alarm_threshold;
+            self->get_bias_low_alarm_threshold        = qsfp_get_bias_low_alarm_threshold;
+            self->get_bias_high_alarm_threshold       = qsfp_get_bias_high_alarm_threshold;
+            self->get_voltage_low_alarm_threshold     = qsfp_get_voltage_low_alarm_threshold;
+            self->get_voltage_high_alarm_threshold    = qsfp_get_voltage_high_alarm_threshold;
+            self->get_temp_low_alarm_threshold        = qsfp_get_temp_low_alarm_threshold;
+            self->get_temp_high_alarm_threshold       = qsfp_get_temp_high_alarm_threshold;
+            self->get_manufacturing_date              = common_get_manufacturing_date;
             self->set_cdr             = unsupported_set_func;
             self->set_soft_rs0        = unsupported_set_func; /* TBD */
             self->set_soft_rs1        = unsupported_set_func; /* TBD */
@@ -7901,6 +9781,8 @@ setup_transvr_public_cb(struct transvr_obj_s *self,
 
         case TRANSVR_TYPE_QSFP_28:
             self->get_id              = common_get_id;
+            self->get_eeprom          = common_get_eeprom;
+            self->get_eeprom_page03   = qsfp_get_eeprom_page03;
             self->get_ext_id          = common_get_ext_id;
             self->get_connector       = common_get_connector;
             self->get_vendor_name     = common_get_vendor_name;
@@ -7943,6 +9825,27 @@ setup_transvr_public_cb(struct transvr_obj_s *self,
             self->get_wavelength      = qsfp_get_wavelength;
             self->get_extphy_offset   = unsupported_get_func2;
             self->get_extphy_reg      = unsupported_get_func2;
+            self->get_rx_power_low_alarm              = qsfp_get_rx_power_low_alarm;
+            self->get_rx_power_high_alarm             = qsfp_get_rx_power_high_alarm;
+            self->get_tx_power_low_alarm              = qsfp_get_tx_power_low_alarm;
+            self->get_tx_power_high_alarm             = qsfp_get_tx_power_high_alarm;
+            self->get_bias_low_alarm                  = qsfp_get_bias_low_alarm;
+            self->get_bias_high_alarm                 = qsfp_get_bias_high_alarm;
+            self->get_voltage_low_alarm               = qsfp_get_voltage_low_alarm;
+            self->get_voltage_high_alarm              = qsfp_get_voltage_high_alarm;
+            self->get_temp_low_alarm                  = qsfp_get_temp_low_alarm;
+            self->get_temp_high_alarm                 = qsfp_get_temp_high_alarm;
+            self->get_rx_power_low_alarm_threshold    = qsfp_get_rx_power_low_alarm_threshold;
+            self->get_rx_power_high_alarm_threshold   = qsfp_get_rx_power_high_alarm_threshold;
+            self->get_tx_power_low_alarm_threshold    = qsfp_get_tx_power_low_alarm_threshold;
+            self->get_tx_power_high_alarm_threshold   = qsfp_get_tx_power_high_alarm_threshold;
+            self->get_bias_low_alarm_threshold        = qsfp_get_bias_low_alarm_threshold;
+            self->get_bias_high_alarm_threshold       = qsfp_get_bias_high_alarm_threshold;
+            self->get_voltage_low_alarm_threshold     = qsfp_get_voltage_low_alarm_threshold;
+            self->get_voltage_high_alarm_threshold    = qsfp_get_voltage_high_alarm_threshold;
+            self->get_temp_low_alarm_threshold        = qsfp_get_temp_low_alarm_threshold;
+            self->get_temp_high_alarm_threshold       = qsfp_get_temp_high_alarm_threshold;
+            self->get_manufacturing_date              = common_get_manufacturing_date;
             self->set_cdr             = qsfp_set_cdr;
             self->set_soft_rs0        = unsupported_set_func; /* TBD */
             self->set_soft_rs1        = unsupported_set_func; /* TBD */
@@ -7957,6 +9860,10 @@ setup_transvr_public_cb(struct transvr_obj_s *self,
 
         case TRANSVR_TYPE_FAKE:
             self->get_id              = fake_get_hex;
+            self->get_eeprom          = fake_get_str;
+            self->get_eeprom_a0       = fake_get_str;
+            self->get_eeprom_a2       = fake_get_str;
+            self->get_eeprom_page03   = fake_get_str;
             self->get_ext_id          = fake_get_hex;
             self->get_connector       = fake_get_hex;
             self->get_vendor_name     = fake_get_str;
@@ -7999,6 +9906,27 @@ setup_transvr_public_cb(struct transvr_obj_s *self,
             self->get_wavelength      = fake_get_str;
             self->get_extphy_offset   = fake_get_str;
             self->get_extphy_reg      = fake_get_str;
+            self->get_rx_power_low_alarm              = fake_get_str;
+            self->get_rx_power_high_alarm             = fake_get_str;
+            self->get_tx_power_low_alarm              = fake_get_str;
+            self->get_tx_power_high_alarm             = fake_get_str;
+            self->get_bias_low_alarm                  = fake_get_str;
+            self->get_bias_high_alarm                 = fake_get_str;
+            self->get_voltage_low_alarm               = fake_get_str;
+            self->get_voltage_high_alarm              = fake_get_str;
+            self->get_temp_low_alarm                  = fake_get_str;
+            self->get_temp_high_alarm                 = fake_get_str;
+            self->get_rx_power_low_alarm_threshold    = fake_get_str;
+            self->get_rx_power_high_alarm_threshold   = fake_get_str;
+            self->get_tx_power_low_alarm_threshold    = fake_get_str;
+            self->get_tx_power_high_alarm_threshold   = fake_get_str;
+            self->get_bias_low_alarm_threshold        = fake_get_str;
+            self->get_bias_high_alarm_threshold       = fake_get_str;
+            self->get_voltage_low_alarm_threshold     = fake_get_str;
+            self->get_voltage_high_alarm_threshold    = fake_get_str;
+            self->get_temp_low_alarm_threshold        = fake_get_str;
+            self->get_temp_high_alarm_threshold       = fake_get_str;
+            self->get_manufacturing_date              = fake_get_str;
             self->set_cdr             = fake_set_hex;
             self->set_soft_rs0        = fake_set_int;
             self->set_soft_rs1        = fake_set_int;
@@ -8127,7 +10055,7 @@ setup_transvr_ssize_attr(char *swp_name,
     self->state             = STATE_TRANSVR_NEW;
     self->info              = STATE_TRANSVR_NEW;
     self->auto_tx_disable   = VAL_TRANSVR_FUNCTION_DISABLE;
-    strncpy(self->swp_name, swp_name, 32);
+    strncpy(self->swp_name, swp_name, sizeof(self->swp_name)-1);
     mutex_init(&self->lock);
     return 0;
 }
@@ -8204,7 +10132,8 @@ create_transvr_obj(char *swp_name,
                    int ioexp_virt_offset,
                    int transvr_type,
                    int chipset_type,
-                   int run_mode){
+                   int run_mode,
+                   int port_id){
 
     struct transvr_obj_s *result_p;
     struct eeprom_map_s  *map_p;
@@ -8250,6 +10179,7 @@ create_transvr_obj(char *swp_name,
     if (setup_i2c_client(result_p) < 0){
         goto err_create_transvr_dattr_fail;
     }
+    result_p->port_id = port_id;
     return result_p;
 
 err_create_transvr_dattr_fail:

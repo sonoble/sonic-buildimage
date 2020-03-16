@@ -55,15 +55,15 @@ class PsuUtil(PsuBase):
         status = 0
                   
         if index == 1 :
-            attr_path = "/sys/class/hwmon/hwmon7/in1_input"
+            attr_path = "/sys/class/hwmon/hwmon7/device/in1_input"
         else :
-            attr_path = "/sys/class/hwmon/hwmon8/in1_input"
+            attr_path = "/sys/class/hwmon/hwmon8/device/in1_input"
 
         attr_value = self.get_attr_value(attr_path)
         if (attr_value != 'ERR'):
             # Check for PSU status
-            if (attr_value != 0):
-                    status = 1
+            if (attr_value != "0"):
+                status = 1
         return status
 
     def get_psu_presence(self, index):
