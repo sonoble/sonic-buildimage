@@ -1,5 +1,5 @@
 [Unit]
-Description=Inventec d7032q28b Platform modules
+Description=Inventec d7264q28b Platform modules
 After=local-fs.target
 Before=pmon.service
 

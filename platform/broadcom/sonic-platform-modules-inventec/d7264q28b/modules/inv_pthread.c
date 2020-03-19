@@ -496,12 +496,12 @@ int fans_control(void)
     if (ret == FAN_TBL_TOTAL) {
         status_led_red("3"); //4Hz
         if (cd_shutdown == 0) {
-            kobject_uevent(status_kobj, KOBJ_REMOVE);
+            //kobject_uevent(status_kobj, KOBJ_REMOVE);
         }
         else if (cd_shutdown > 0)
         {
             printk(KERN_ERR "[p_thread] All fans failed.\n");
-            printk(KERN_ERR "[p_thread] System shutdown immediately in %d seconds.\n", cd_shutdown);
+            printk(KERN_ERR "[p_thread] System is going to shutdown immediately in %d seconds.\n", cd_shutdown);
         }
         cd_shutdown -= 1;
     }

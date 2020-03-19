@@ -40,7 +40,6 @@ args = []
 FORCE = 0
 i2c_prefix = '/sys/bus/i2c/devices/'
 
-
 if DEBUG == True:
     print sys.argv[0]
     print 'ARGV      :', sys.argv[1:]   
@@ -75,7 +74,9 @@ def main():
             logging.info('no option')                          
     for arg in args:            
         if arg == 'install':
-           install()
+           install(0)
+        elif arg == 'fast-reboot-install':
+           install(1)
         elif arg == 'clean':
            uninstall()
         else:
@@ -104,14 +105,7 @@ def exec_cmd(cmd, show):
             print('Failed :'+cmd)
     return  status, output
         
-instantiate =[ 
-#'echo pca9545 0x70> /sys/bus/i2c/devices/i2c-0/new_device',
-#'echo pca9548 0x72> /sys/bus/i2c/devices/i2c-1/new_device',
-#'echo pca9548 0x72> /sys/bus/i2c/devices/i2c-2/new_device',
-#'echo pca9548 0x72> /sys/bus/i2c/devices/i2c-3/new_device',
-#'echo pca9548 0x72> /sys/bus/i2c/devices/i2c-4/new_device',
-#'echo inv_psoc 0x66> /sys/bus/i2c/devices/i2c-5/new_device',
-#'echo inv_cpld 0x55> /sys/bus/i2c/devices/i2c-5/new_device',
+instantiate =[
 'echo inv_eeprom 0x53> /sys/bus/i2c/devices/i2c-0/new_device']
 
 drivers =[
@@ -122,22 +116,37 @@ drivers =[
 'i2c-mux-pca954x',
 'i2c-dev',
 'inv_eeprom',
-'inv_platform',
 'inv_psoc',
+'inv_platform',
 'inv_cpld',
 'inv_pthread',
 'swps']
  
                     
-def system_install():
+def system_install(boot_option):
+    ''' boot_option: 0 - normal, 1 - fast-reboot'''
     global FORCE
 	
     #remove default drivers to avoid modprobe order conflicts
+    time.sleep(2)
     status, output = exec_cmd("rmmod i2c_ismt ", 1)
     status, output = exec_cmd("rmmod i2c-i801 ", 1)
+    status, output = exec_cmd("rmmod gpio-ich ", 1)
+    status, output = exec_cmd("rmmod lpc_ich ", 1)
+
+
     #install drivers
     for i in range(0,len(drivers)):
-       status, output = exec_cmd("modprobe "+drivers[i], 1)
+        if drivers[i] == "gpio-ich":
+            status, output = exec_cmd("modprobe gpio-ich gpiobase=0", 1)
+        elif drivers[i] == "swps":
+            if boot_option == 1:
+                status, output = exec_cmd("modprobe swps io_no_init=1", 1)
+            else:
+                status, output = exec_cmd("modprobe "+drivers[i], 1)
+        else:
+            status, output = exec_cmd("modprobe "+drivers[i], 1)
+
     if status:
 	   print output
 	   if FORCE == 0:                
@@ -152,50 +161,50 @@ def system_install():
 	   if FORCE == 0:                
 	      return status   
     
-    for i in range(10,17):
-        status, output =exec_cmd("echo sff8436 0x50 > /sys/bus/i2c/devices/i2c-0/i2c-2/i2c-"+str(i)+"/new_device", 1)
+    for i in range(10,18):
+        status, output =exec_cmd("echo optoe2 0x50 > /sys/bus/i2c/devices/i2c-0/i2c-2/i2c-"+str(i)+"/new_device", 1)
         if status:
             print output
             if FORCE == 0:
                 return status
-    for i in range(18,25):
-        status, output =exec_cmd("echo sff8436 0x50 > /sys/bus/i2c/devices/i2c-0/i2c-3/i2c-"+str(i)+"/new_device", 1)
+    for i in range(18,26):
+        status, output =exec_cmd("echo optoe2 0x50 > /sys/bus/i2c/devices/i2c-0/i2c-3/i2c-"+str(i)+"/new_device", 1)
         if status:
             print output
             if FORCE == 0:
                 return status
-    for i in range(26,33):
-        status, output =exec_cmd("echo sff8436 0x50 > /sys/bus/i2c/devices/i2c-0/i2c-4/i2c-"+str(i)+"/new_device", 1)
+    for i in range(26,34):
+        status, output =exec_cmd("echo optoe2 0x50 > /sys/bus/i2c/devices/i2c-0/i2c-4/i2c-"+str(i)+"/new_device", 1)
         if status:
             print output
             if FORCE == 0:
                 return status
-    for i in range(34,41):
-        status, output =exec_cmd("echo sff8436 0x50 > /sys/bus/i2c/devices/i2c-0/i2c-5/i2c-"+str(i)+"/new_device", 1)
+    for i in range(34,42):
+        status, output =exec_cmd("echo optoe2 0x50 > /sys/bus/i2c/devices/i2c-0/i2c-5/i2c-"+str(i)+"/new_device", 1)
         if status:
             print output
             if FORCE == 0:            
                 return status   
-    for i in range(42,49):
-        status, output =exec_cmd("echo sff8436 0x50 > /sys/bus/i2c/devices/i2c-0/i2c-6/i2c-"+str(i)+"/new_device", 1)
+    for i in range(42,50):
+        status, output =exec_cmd("echo optoe2 0x50 > /sys/bus/i2c/devices/i2c-0/i2c-6/i2c-"+str(i)+"/new_device", 1)
         if status:
             print output
             if FORCE == 0:            
                 return status     
-    for i in range(50,57):
-        status, output =exec_cmd("echo sff8436 0x50 > /sys/bus/i2c/devices/i2c-0/i2c-7/i2c-"+str(i)+"/new_device", 1)
+    for i in range(50,58):
+        status, output =exec_cmd("echo optoe2 0x50 > /sys/bus/i2c/devices/i2c-0/i2c-7/i2c-"+str(i)+"/new_device", 1)
         if status:
             print output
             if FORCE == 0:            
                 return status     
-    for i in range(58,65):
-        status, output =exec_cmd("echo sff8436 0x50 > /sys/bus/i2c/devices/i2c-0/i2c-8/i2c-"+str(i)+"/new_device", 1)
+    for i in range(58,66):
+        status, output =exec_cmd("echo optoe2 0x50 > /sys/bus/i2c/devices/i2c-0/i2c-8/i2c-"+str(i)+"/new_device", 1)
         if status:
             print output
             if FORCE == 0:            
                 return status 
-    for i in range(66,73):
-        status, output =exec_cmd("echo sff8436 0x50 > /sys/bus/i2c/devices/i2c-0/i2c-9/i2c-"+str(i)+"/new_device", 1)
+    for i in range(66,74):
+        status, output =exec_cmd("echo optoe2 0x50 > /sys/bus/i2c/devices/i2c-0/i2c-9/i2c-"+str(i)+"/new_device", 1)
         if status:
             print output
             if FORCE == 0:
@@ -207,11 +216,12 @@ def system_ready():
     if not device_found(): 
         return False
     return True
-               
-def install():                      
+
+def install(boot_option=0):
+    ''' boot_option: 0 - normal, 1 - fast-reboot '''
     if not device_found():
         print "No device, installing...."     
-        status = system_install() 
+        status = system_install(boot_option)
         if status:
             if FORCE == 0:        
                 return  status
@@ -224,6 +234,7 @@ def uninstall():
     #uninstall drivers
     for i in range(len(drivers)-1,-1,-1):
        status, output = exec_cmd("rmmod "+drivers[i], 1)
+    status, output = exec_cmd("rmmod gpio_ich ", 1)
     if status:
 	   print output
 	   if FORCE == 0:                

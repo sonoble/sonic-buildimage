@@ -188,6 +188,29 @@ static struct 	platform_device 	device_i2c_gpio0 = {
 	.dev.platform_data = &i2c_gpio_platdata0,
 };
 #endif
+
+
+
+#define PLAT_MAX_I2C_CLIENTS 32
+static struct i2c_client *plat_i2c_client[PLAT_MAX_I2C_CLIENTS];
+static int num_i2c_clients = 0;
+static int plat_i2c_client_add(struct i2c_client *e)
+{
+    if (num_i2c_clients >= PLAT_MAX_I2C_CLIENTS)
+      return -1;
+ 
+    plat_i2c_client[num_i2c_clients] = e;
+    num_i2c_clients++;
+    return num_i2c_clients;
+}
+ 
+static void plat_i2c_client_remove_all(void)
+{
+    int i;
+    for (i = num_i2c_clients-1; i >= 0; i--)
+       i2c_unregister_device(plat_i2c_client[i]);
+}
+
 static int __init inv_platform_init(void)
 {
     struct i2c_adapter *adap = NULL;
@@ -223,7 +246,13 @@ static int __init inv_platform_init(void)
         for(j=0; j<i2cdev_list[i].size; j++) {
                 for(k=0; k<300; k++) {
                         e = i2c_new_device(adap, &i2cdev_list[i].board_info[j] );
-                        if(e == NULL) msleep(10); else break;
+                        if(e == NULL) {
+                            msleep(10);
+                        }
+                        else {
+                            plat_i2c_client_add(e);
+                            break;
+                        }
                 }
         }
     }
@@ -231,7 +260,13 @@ static int __init inv_platform_init(void)
     return ret;    
 }
 
+static void __exit inv_platform_exit(void)
+{
+    plat_i2c_client_remove_all();
+}
+
 module_init(inv_platform_init);
+module_exit(inv_platform_exit);
 //arch_initcall(inv_platform_init);
 
 MODULE_AUTHOR("Inventec");

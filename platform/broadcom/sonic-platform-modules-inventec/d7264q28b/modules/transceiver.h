@@ -167,6 +167,7 @@
 /* For system internal */
 #define VAL_TRANSVR_COMID_ARREESS       (0x50)
 #define VAL_TRANSVR_COMID_OFFSET        (0x00)
+#define VAL_TRANSVR_EXTPHY_ADDR_56      (0x56)
 #define VAL_TRANSVR_8472_READY_ADDR     (0x51)
 #define VAL_TRANSVR_8472_READY_PAGE     (-1)
 #define VAL_TRANSVR_8472_READY_OFFSET   (110)
@@ -204,7 +205,10 @@
 
 /* BCM chip type define */
 #define BCM_CHIP_TYPE_TRIDENT_2         (31001)  /* Magnolia, Hudson32i, Spruce */
-#define BCM_CHIP_TYPE_TOMAHAWK          (31002)  /* Redwood, Cypress */
+#define BCM_CHIP_TYPE_TOMAHAWK          (31002)  /* Redwood, Cypress, Sequoia */
+#define BCM_CHIP_TYPE_TRIDENT_3         (31003)  /* Maple */
+
+#define BF_CHIP_TYPE_TOFINO             (31011)  /* Lavender */
 
 /* Info from transceiver EEPROM */
 struct eeprom_map_s {
@@ -650,6 +654,12 @@ struct transvr_obj_s {
      */
     uint8_t option[3];
 
+    /* [Prop]: External PHY offset
+     * [Desc]: It needs to be setup first if you want to access transceiver external phy.
+     * [Note]: This feature dependent on transceiver.
+     *         Currently, only 1G-RJ45 transceiver supported it.
+     */
+    uint8_t extphy_offset;
 
     /* ========== Object private property ==========
      */
@@ -718,6 +728,8 @@ struct transvr_obj_s {
     int  (*get_rx_am)(struct transvr_obj_s *self, char *buf_p);
     int  (*get_rx_em)(struct transvr_obj_s *self, char *buf_p);
     int  (*get_wavelength)(struct transvr_obj_s *self, char *buf_p);
+    int  (*get_extphy_offset)(struct transvr_obj_s *self, char *buf_p);
+    int  (*get_extphy_reg)(struct transvr_obj_s *self, char *buf_p);
     int  (*set_cdr)(struct transvr_obj_s *self, int input_val);
     int  (*set_soft_rs0)(struct transvr_obj_s *self, int input_val);
     int  (*set_soft_rs1)(struct transvr_obj_s *self, int input_val);
@@ -726,6 +738,8 @@ struct transvr_obj_s {
     int  (*set_tx_eq)(struct transvr_obj_s *self, int input_val);
     int  (*set_rx_am)(struct transvr_obj_s *self, int input_val);
     int  (*set_rx_em)(struct transvr_obj_s *self, int input_val);
+    int  (*set_extphy_offset)(struct transvr_obj_s *self, int input_val);
+    int  (*set_extphy_reg)(struct transvr_obj_s *self, int input_val);
 
     /* ========== Object private functions ==========
      */
@@ -786,6 +800,9 @@ int resync_channel_tier_2(struct transvr_obj_s *self);
 void alarm_msg_2_user(struct transvr_obj_s *self, char *emsg);
 
 #endif /* TRANSCEIVER_H */
+
+
+
 
 
 
