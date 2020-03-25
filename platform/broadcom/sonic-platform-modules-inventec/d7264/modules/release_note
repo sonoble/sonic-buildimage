@@ -1,0 +1,28 @@
+Repository          : onie
+Branch              : uefi
+machine_folder      : machine/inventec/sequoia_b0_bde
+
+Title   : [sequoia_b0] psu id start from 1, sync with other project
+Commit  : 86f38f4f10f27c330b1cc24fb1c5af98f95769e5
+
+inv_cpld.c
+inv_platform.c
+inv_psoc.c
+inv_psu.c
+inv_tmp75.c
+inv_ucd90160.c
+
+======================================================================
+Repository          : swps-driver
+Branch              : maple_c1
+
+[swps]
+version : 4.4.1
+Commit  : 60b9e66f97d1a89df3c5a021d6d580bc238523ac
+
+=======================================================================
+[kernel driver 4.9.0.8-amd64 ]
+
+i2c-mux-pca9541     (modified)
+ucd9000             (original)
+pmbus.h             (original)

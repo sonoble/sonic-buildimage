@@ -1,0 +1,4 @@
+d7264/utils/inventec_d7264_util.py                      /usr/local/bin
+common/utils/platform/*.py                              /usr/share/sonic/device/x86_64-inventec_d7264-r0/plugins
+systemd/platform-modules-d7264.service                  /lib/systemd/system
+d7264/utils/sonic_platform-1.0-py2-none-any.whl         /usr/share/sonic/device/x86_64-inventec_d7264-r0
