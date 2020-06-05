@@ -22,6 +22,7 @@ except ImportError as e:
     raise ImportError(str(e) + "- required module not found")
 
 INFO_OFFSET = 128
+THRE_OFFSET = 384 #128*3
 DOM_OFFSET  = 0
 
 XCVR_INTFACE_BULK_OFFSET     = 0
@@ -495,7 +496,7 @@ class QSfp(SfpBase):
             return {}
 
         transceiver_dom_threshold_dict = dict.fromkeys(transceiver_dom_threshold_info_dict_keys, 'N/A')
-        offset = DOM_OFFSET
+        offset = THRE_OFFSET
 
         dom_module_threshold_raw = self.__read_eeprom_specific_bytes((offset + QSFP_MODULE_THRESHOLD_OFFSET), QSFP_MODULE_THRESHOLD_WIDTH)
         if dom_module_threshold_raw:
