@@ -77,6 +77,8 @@ def main():
     for arg in args:
         if arg == 'install':
             install()
+        elif arg == 'fast-reboot-install':
+            install(1)
         elif arg == 'clean':
             uninstall()
         else:
