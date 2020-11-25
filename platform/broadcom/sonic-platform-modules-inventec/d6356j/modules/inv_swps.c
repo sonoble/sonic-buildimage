@@ -1801,6 +1801,7 @@ show_attr_present(struct device *dev_p,
                                    tobj_p->ioexp_obj_p->get_present,
                                    buf_p);
 #endif
+
 }
 
 
@@ -2866,6 +2867,8 @@ err_check_transvr_objs:
 static void
 swp_polling_worker(struct work_struct *work){
 
+    int next_period = 1;
+    
     if (io_exp_isr_handler() < 0) {
         goto polling_reset_i2c;
     }
@@ -2906,12 +2909,17 @@ polling_reset_i2c:
     if (reset_i2c_topology() < 0) {
         SWPS_ERR("%s: reset i2c fail!\n", __func__);
         flag_i2c_reset = 1;
+        next_period = _get_polling_period();
     } else {
         SWPS_DEBUG("%s: reset_i2c_topology OK.\n", __func__);
         flag_i2c_reset = 0;
+        next_period = 1;
+        /* Ensure next round will be update */
+        scan_100ms = PROCESS_TIME;
+        process_scan = IOEXP_CHECK_TIME;
     }
 polling_schedule_round:
-    schedule_delayed_work(&swp_polling, _get_polling_period());
+    schedule_delayed_work(&swp_polling, next_period);
 }
 
 
@@ -3879,10 +3887,6 @@ err_init_swps_common_1:
 static int __init
 swp_module_init(void){
 
-    if (sff_io_init() < 0) {
-
-        goto err_init_out;
-    }
     if (get_platform_type() < 0){
         goto err_init_out;
     }
@@ -3902,6 +3906,9 @@ swp_module_init(void){
         goto err_init_mux;
     }
     if (init_dev_topology() < 0){
+        goto err_init_topology;
+    }
+    if (sff_io_init() < 0) {
         goto err_init_topology;
     }
     if (init_swps_common() < 0){
@@ -3956,6 +3963,7 @@ MODULE_SOFTDEP("pre: inv_platform");
 
 module_init(swp_module_init);
 module_exit(swp_module_exit);
+
 
 
 

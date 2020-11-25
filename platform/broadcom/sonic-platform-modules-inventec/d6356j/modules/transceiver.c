@@ -6608,7 +6608,7 @@ static int qsfp_data_ready_check(struct transvr_obj_s *self)
     int ready  = VAL_TRANSVR_8436_READY_VALUE;
     int err    = DEBUG_TRANSVR_INT_VAL;
     char *emsg = DEBUG_TRANSVR_STR_VAL;
-
+    
     /* Select target page */
     err = _common_setup_page(self, addr, page, offs, 1, 0);
     if (err < 0) {
@@ -6624,13 +6624,13 @@ static int qsfp_data_ready_check(struct transvr_obj_s *self)
     if ((err & (1<<bit)) == ready) {
         return EVENT_TRANSVR_TASK_DONE;
     }
-
+    
     return EVENT_TRANSVR_TASK_WAIT;
 
 err_data_check:
     SWPS_INFO("%s %s: %s 0x%x\n", self->swp_name, __func__, emsg, err);
     return EVENT_TRANSVR_INIT_FAIL;
-}
+}    
 
 int
 _taskfunc_qsfp_setup_power_mod(struct transvr_obj_s *self,
@@ -6665,12 +6665,12 @@ _taskfunc_qsfp_setup_power_mod(struct transvr_obj_s *self,
     }
     /*check if data is ready in high power mode*/
     if (0 == setup_val) {
-
+        
         for (i = 0 ; i < check_num; i++) {
 
             if ((err_val = qsfp_data_ready_check(self)) == EVENT_TRANSVR_TASK_DONE) {
                 break;
-            }
+            } 
             msleep(QSFP_DATA_READY_CHECK_DELAY_MS);
         }
         if (i >= check_num) {
@@ -6680,7 +6680,7 @@ _taskfunc_qsfp_setup_power_mod(struct transvr_obj_s *self,
             SWPS_INFO("%s qsfp_data gets ready in %dms\n", self->swp_name, i*QSFP_DATA_READY_CHECK_DELAY_MS);
         }
     }
-
+    
     return EVENT_TRANSVR_TASK_DONE;
 
 err_private_taskfunc_qsfp_setup_power_mod_1:
@@ -8649,6 +8649,37 @@ private_common_send_uevent_4_send:
                               uevent_envp);
 }
 
+
+int
+_isolate_send_uevent(struct transvr_obj_s* self) {
+
+    enum kobject_action u_action = KOBJ_ADD;
+    char *uevent_envp[4];
+    char tmp_str[64]     = DEBUG_TRANSVR_STR_VAL;
+    char str_if_info[32] = DEBUG_TRANSVR_STR_VAL;
+    char str_sp_info[32] = DEBUG_TRANSVR_STR_VAL;
+    char str_ln_info[64] = DEBUG_TRANSVR_STR_VAL;
+
+    if (_common_get_if_lane(self, tmp_str) < 0) {
+        snprintf(str_ln_info, sizeof(str_ln_info),
+                "%s=%s", TRANSVR_UEVENT_KEY_LANE, TRANSVR_UEVENT_UNKNOW);
+    } else {
+        snprintf(str_ln_info, sizeof(str_ln_info),
+                "%s=%s", TRANSVR_UEVENT_KEY_LANE, tmp_str);
+    }
+    snprintf(str_if_info, sizeof(str_if_info), "%s=%s", TRANSVR_UEVENT_KEY_IF, TRANSVR_UEVENT_ISOLATED);
+    snprintf(str_sp_info, sizeof(str_sp_info), "%s=%s", TRANSVR_UEVENT_KEY_SP, TRANSVR_UEVENT_ISOLATED);
+
+    uevent_envp[0] = str_if_info;
+    uevent_envp[1] = str_sp_info;
+    uevent_envp[2] = str_ln_info;
+    uevent_envp[3] = NULL;
+
+    return kobject_uevent_env(&(self->transvr_dev_p->kobj),
+                              u_action,
+                              uevent_envp);
+}
+
 int
 sfp_send_uevent(struct transvr_obj_s* self,
                 enum kobject_action u_action) {
@@ -9365,7 +9396,7 @@ _is_transvr_hw_ready(struct transvr_obj_s *self,
         emsg = "detect using unusual definition.";
         goto bypass_is_transvr_hw_ready;
     }
-/*skip data ready check in this stage , move the check in qsfp_data_ready_check() instead*/
+/*skip data ready check in this stage , move the check in qsfp_data_ready_check() instead*/    
 #if 0
     /* Get Status Indicators */
     err = i2c_smbus_read_byte_data(self->i2c_client_p, offs);
@@ -9377,7 +9408,7 @@ _is_transvr_hw_ready(struct transvr_obj_s *self,
         return EVENT_TRANSVR_TASK_DONE;
     }
     return EVENT_TRANSVR_TASK_WAIT;
-#else
+#else 
     return EVENT_TRANSVR_TASK_DONE;
 
 #endif
@@ -10345,6 +10376,7 @@ int
 isolate_transvr_obj(struct transvr_obj_s *self) {
 
     self->state = STATE_TRANSVR_ISOLATED;
+    _isolate_send_uevent(self);
     SWPS_INFO("%s: %s be isolated\n", __func__, self->swp_name);
     return 0;
 }
@@ -10393,6 +10425,7 @@ MODULE_LICENSE("GPL");
  *    => Verify 25GBASE-LR
  *    => Verify 40G Active Cable (XLPPI)
  */
+
 
 
 

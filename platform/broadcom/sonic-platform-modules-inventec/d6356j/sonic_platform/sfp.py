@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/uso/bin/env python
 #
 # Name: sfp.py, version: 1.0
 #
@@ -51,12 +51,14 @@ SFP_STATUS_CONTROL_OFFSET   = 110
 SFP_STATUS_CONTROL_WIDTH    = 1
 SFP_TX_DISABLE_HARD_BIT     = 7
 SFP_TX_DISABLE_SOFT_BIT     = 6
+SFP_TYPE = "SFP"
+QSFP_TYPE = "QSFP"
 
 class Sfp(SfpBase):
 
     def __init__(self, index):
         self.__index = index
-
+        self.sfp_type = SFP_TYPE
         self.__platform = "x86_64-inventec_d6356j-r0"
         self.__hwsku    = "INVENTEC-D6356J"
 
@@ -73,11 +75,23 @@ class Sfp(SfpBase):
 
         self.__presence_attr = None
         self.__eeprom_path = None
+        self.__port_info_attr = None
         if self.__index in range(0, self.__port_end + 1):
-            self.__presence_attr = "/sys/class/swps/port{}/present".format(self.__index)
-            self.__eeprom_path = "/sys/class/i2c-adapter/i2c-{0}/{0}-0050/eeprom".format(self.__port_to_i2c_mapping[self.__index])
+            self.__presence_attr  = "/sys/class/swps/port{}/present".format(self.__index)
+            self.__port_info_attr = "/sys/class/swps/port{}/info".format(self.__index)
+            self.__eeprom_path    = "/sys/class/i2c-adapter/i2c-{0}/{0}-0050/eeprom".format(self.__port_to_i2c_mapping[self.__index])
 
         SfpBase.__init__(self)
+
+    def __is_isolated(self):
+        SWPS_PORT_STATUS_ISOLATED = "-102"
+        
+        if self.__port_info_attr == None:
+            return False
+        rv_str = self.__get_attr_value(self.__port_info_attr)
+        if SWPS_PORT_STATUS_ISOLATED in rv_str:
+            return True
+        return False
 
     def __get_attr_value(self, attr_path):
 
@@ -112,6 +126,9 @@ class Sfp(SfpBase):
 
         for i in range(0, num_bytes):
             eeprom_raw.append("0x00")
+
+        if self.__is_isolated():
+            return eeprom_raw
 
         sysfs_eeprom_path = self.__eeprom_path
         try:
@@ -181,7 +198,6 @@ class Sfp(SfpBase):
         if (attr_rv != 'ERR'):
             if (int(attr_rv) == 0):
                 presence = True
-
         return presence
 
     def get_model(self):
@@ -217,6 +233,27 @@ class Sfp(SfpBase):
 # SFP methods
 ##############################################
 
+    def _dummy_xcvr_info_dict(self, xcvr_info_keys):
+        xcvr_info = dict.fromkeys(xcvr_info_keys, "0")
+        xcvr_info['nominal_bit_rate']          = "255"
+        xcvr_info['type']                      = "SFP/SFP+/SFP28"
+        xcvr_info['type_abbrv_name']           = "SFP"
+        xcvr_info['manufacturename']           = "I2C N/G"
+        xcvr_info['modelname']                 = "I2C N/G"
+        xcvr_info['serialnum']                 = "I2C N/G"
+        xcvr_info['specification_compliance']  = "{}"
+        return xcvr_info
+    
+    def _dummy_xcvr_dom_dict(self, xcvr_dom_keys):
+        xcvr_dom = dict.fromkeys(xcvr_dom_keys, "N/A")
+        xcvr_dom['reset_status']        = self.get_reset_status()
+        xcvr_dom['rx_los']              = self.get_rx_los()
+        xcvr_dom['tx_fault']            = self.get_tx_fault()
+        xcvr_dom['tx_disable']          = self.get_tx_disable()
+        xcvr_dom['tx_disable_channel']  = self.get_tx_disable_channel()
+        xcvr_dom['lp_mode']             = self.get_lpmode()
+        return xcvr_dom
+
     def get_transceiver_info(self):
         """
         Retrieves transceiver info of this SFP
@@ -224,7 +261,7 @@ class Sfp(SfpBase):
         Returns:
             A dict which contains following keys/values :
         ========================================================================
-        keys                       |Value Format   |Information	
+        keys                       |Value Format   |Information    
         ---------------------------|---------------|----------------------------
         type                       |1*255VCHAR     |type of SFP
         hardwarerev                |1*255VCHAR     |hardware version of SFP
@@ -265,6 +302,9 @@ class Sfp(SfpBase):
         sfpi_obj = sff8472InterfaceId()
         if not self.get_presence() or not sfpi_obj:
             return {}
+
+        if self.__is_isolated():
+            return self._dummy_xcvr_info_dict(transceiver_info_dict_keys)
 
         offset = INFO_OFFSET
 
@@ -331,7 +371,7 @@ class Sfp(SfpBase):
         Returns:
             A dict which contains following keys/values :
         ========================================================================
-        keys                       |Value Format   |Information	
+        keys                       |Value Format   |Information    
         ---------------------------|---------------|----------------------------
         rx_los                     |BOOLEAN        |RX loss-of-signal status, True if has RX los, False if not.
         tx_fault                   |BOOLEAN        |TX fault status, True if has TX fault, False if not.
@@ -364,6 +404,9 @@ class Sfp(SfpBase):
         sfpd_obj = sff8472Dom()
         if not self.get_presence() or not sfpd_obj:
             return {}
+
+        if self.__is_isolated():
+            return self._dummy_xcvr_dom_dict(transceiver_dom_info_dict_keys)
 
         eeprom_ifraw = self.__read_eeprom_specific_bytes(0, DOM_OFFSET)
         sfpi_obj = sff8472InterfaceId(eeprom_ifraw)
@@ -660,6 +703,11 @@ class Sfp(SfpBase):
         Returns:
             A boolean, True if tx_disable is set successfully, False if not
         """
+
+        # Neil
+        if self.__is_isolated():
+            return False
+
         sysfs_eeprom_path = self.__eeprom_path
         status_control_raw = self.__read_eeprom_specific_bytes(SFP_STATUS_CONTROL_OFFSET, SFP_STATUS_CONTROL_WIDTH)
         if status_control_raw is not None:
@@ -736,4 +784,38 @@ class Sfp(SfpBase):
         """
         # SFP doesn't support this feature
         return False
+ 
+    def get_eeprom_raw(self):
+        """ get eeprom data"""
+        eeprom_raw_0 = []
+        eeprom_raw_1 = []
+        file_eeprom_0 = None
+        file_eeprom_1 = None
+        for i in range(0, 128):
+            eeprom_raw_0.append("0x00");
+            eeprom_raw_1.append("0x00")
+        try:
+            file_eeprom = open(self.__eeprom_path, mode="rb", buffering=0)
+            if self.sfp_type == SFP_TYPE:
+                file_eeprom.seek(0)
+                raw0 = file_eeprom.read(128)
+                file_eeprom.seek(256)
+                raw1 = file_eeprom.read(128)
+            elif self.sfp_type == QSFP_TYPE:
+                file_eeprom.seek(0)
+                raw0 = file_eeprom.read(128)
+                file_eeprom.seek(128)
+                raw1 = file_eeprom.read(128)
+            for i in range(0, 128):
+                eeprom_raw_0[i] = hex(ord(raw0[i]))[2:].zfill(2)
+                eeprom_raw_1[i] = hex(ord(raw1[i]))[2:].zfill(2)
+        except Exception as e:
+            print("get_eeprom_raw failed due to {}".format(repr(e)))
+            pass
+
+        finally:
+            if file_eeprom:
+                file_eeprom.close()
+        return (eeprom_raw_0, eeprom_raw_1)
+
 

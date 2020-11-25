@@ -126,7 +126,7 @@ static int inv_i2c_smbus_read_word_data(struct i2c_client *client, u8 offset)
     }
 
     if (i >= RETRY_COUNT) {
-        SFF_IO_ERR("%s fail:offset:0x%x try %d/%d! Error Code: %d\n", __func__, offset, i, RETRY_COUNT, ret);
+        SFF_IO_INFO("%s fail:offset:0x%x try %d/%d! Error Code: %d\n", __func__, offset, i, RETRY_COUNT, ret);
     }
 
     return ret;
@@ -147,7 +147,7 @@ static int inv_i2c_smbus_write_word_data(struct i2c_client *client, u8 offset, u
         break;
     }
     if (i >= RETRY_COUNT) {
-        SFF_IO_ERR("%s fail:offset:0x%x try %d/%d! Error Code: %d\n", __func__, offset, i, RETRY_COUNT, ret);
+        SFF_IO_INFO("%s fail:offset:0x%x try %d/%d! Error Code: %d\n", __func__, offset, i, RETRY_COUNT, ret);
     }
     return ret;
 }
@@ -166,7 +166,7 @@ static int inv_i2c_smbus_write_byte_data(struct i2c_client *client, u8 offset, u
         break;
     }
     if (i >= RETRY_COUNT) {
-        SFF_IO_ERR("%s fail:offset:0x%x try %d/%d! Error Code: %d\n", __func__, offset, i, RETRY_COUNT, ret);
+        SFF_IO_INFO("%s fail:offset:0x%x try %d/%d! Error Code: %d\n", __func__, offset, i, RETRY_COUNT, ret);
     }
     return ret;
 }
@@ -186,7 +186,7 @@ static int inv_i2c_smbus_read_byte_data(struct i2c_client *client, u8 offset)
     }
 
     if (i >= RETRY_COUNT) {
-        printk("%s fail:offset:0x%x try %d/%d! Error Code: %d\n", __func__, offset, i, RETRY_COUNT, ret);
+        SFF_IO_INFO("%s fail:offset:0x%x try %d/%d! Error Code: %d\n", __func__, offset, i, RETRY_COUNT, ret);
     }
 
     return ret;
@@ -514,7 +514,7 @@ int io_exp_isr_handler(void)
     if (val == 0) {
         //SFF_IO_INFO("1.gpio:%d level: %d\n", gpio_ioexpander_int, value);
         if ((ret = ioexp_isr_reg_get(&input_change)) < 0 ) {
-            SFF_IO_ERR("read fail\n");
+            SFF_IO_INFO("read fail\n");
             return ret;
         }
 
@@ -528,12 +528,12 @@ int io_exp_isr_handler(void)
                 ioexp = find_ioexp(io_exp_present, input_change_table[idx]);
                 if (NULL == ioexp) {
 
-                    SFF_IO_ERR("cant find io exp present: %d\n", input_change_table[idx]);
+                    SFF_IO_INFO("cant find io exp present: %d\n", input_change_table[idx]);
                     break;
                 }
                 ret = pca9555_word_read(ioexp->ch, ioexp->addr, pca9555_input_reg[0]);
                 if (ret < 0) {
-                    SFF_IO_ERR("present read word fail: ch:0x%x addr:0x%x\n", ioexp->ch, ioexp->addr);
+                    SFF_IO_INFO("present read word fail: ch:0x%x addr:0x%x\n", ioexp->ch, ioexp->addr);
                     return ret;
                 }
                 port = ioexp->port_min;
@@ -567,7 +567,7 @@ int io_exp_isr_handler(void)
                 ioexp = find_ioexp(io_exp_rxlos, input_change_table[idx]);
                 if (NULL == ioexp) {
 
-                    SFF_IO_ERR("cant find io exp rxlos: %d\n", input_change_table[idx]);
+                    SFF_IO_INFO("cant find io exp rxlos: %d\n", input_change_table[idx]);
                     break;
                 }
                 port = ioexp->port_min;
@@ -593,7 +593,7 @@ int io_exp_isr_handler(void)
                 ioexp = find_ioexp(io_exp_txfault, input_change_table[idx]);
                 if (NULL == ioexp) {
 
-                    SFF_IO_ERR("cant find io exp tx fault: %d\n", input_change_table[idx]);
+                    SFF_IO_INFO("cant find io exp tx fault: %d\n", input_change_table[idx]);
                     break;
                 }
                 port = ioexp->port_min;
@@ -633,7 +633,9 @@ int ioexpander_int_init(void)
         SFF_IO_ERR("valid gpio:%d ret:%d\n", gpio_ioexpander_int, result);
         return -1;
     }
-
+/*fix autorequest GPIO fail problem , since the direction is determined on BIOS stage
+ * so dont need to set direction in driver stage*/    
+#if 0
     value = gpio_direction_input(gpio_ioexpander_int);
     if (value < 0 ) {
 
@@ -641,9 +643,9 @@ int ioexpander_int_init(void)
         return -1;
 
     }
+#endif
     value = gpio_get_value(gpio_ioexpander_int);
     SFF_IO_INFO("ok gpio:%d value:%d\n", gpio_ioexpander_int, value);
-
     if (cpld_ioexpander_init() < 0) {
         gpio_free(gpio_ioexpander_int);
         return -1;
@@ -796,3 +798,4 @@ module_exit(example_exit);
 #endif
 //MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Alang");
+

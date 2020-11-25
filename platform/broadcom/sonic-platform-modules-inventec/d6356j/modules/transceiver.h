@@ -83,6 +83,7 @@
 #define TRANSVR_UEVENT_KEY_SP           "IF_SPEED"
 #define TRANSVR_UEVENT_KEY_LANE         "IF_LANE"
 #define TRANSVR_UEVENT_UNKNOW           "UNKNOW"
+#define TRANSVR_UEVENT_ISOLATED         "ISOLATED"
 #define TRANSVR_IF_KR                   "KR"
 #define TRANSVR_IF_KR4                  "KR4"
 #define TRANSVR_IF_SR                   "SR"
@@ -1032,6 +1033,7 @@ int resync_channel_tier_2(struct transvr_obj_s *self);
 void alarm_msg_2_user(struct transvr_obj_s *self, char *emsg);
 int transvr_health_mtr(struct transvr_obj_s* self);
 #endif /* TRANSCEIVER_H */
+
 
 
 

@@ -8,6 +8,7 @@ try:
     import socket
     import re
     import os
+    import sys
     from collections import OrderedDict
 except ImportError as e:
     raise ImportError("%s - required module not found" % str(e))
@@ -90,26 +91,67 @@ class TransceiverEvent(object):
     def __init__(self):
         pass
 
-    def get_transceiver_change_event(self, timeout=0):
+    @staticmethod
+    def _read_attr_value(attr_path):
+
+        retval = 'ERR'
+        if (not os.path.isfile(attr_path)):
+            return retval
+
+        try:
+            with open(attr_path, 'r') as fd:
+                retval = fd.read()
+        except Exception as error:
+            print("Unable to open ", attr_path, " file !")
+
+        retval = retval.rstrip(' \t\n\r')
+        return retval
+    
+
+    @staticmethod
+    def handle_update_time_gap(swps_port_num):
+        cycle_limit  = 10
+        cycle_period = 0.1
+        present_now  = "ERR"
+        present_up   = "0"
+        present_path = "/sys/class/swps/{}/present".format(swps_port_num)
+        
+        for i in range(0, cycle_limit):
+            present_now = TransceiverEvent._read_attr_value(present_path)
+            if present_up in present_now:
+                return True
+            time.sleep(cycle_period)
+        
+        print("handle_update_time_gap timeout!")
+        return False
+
+
+    @staticmethod
+    def get_transceiver_change_event(timeout=0):
+        STR_SWPS_MOD_NAME  = "swps"
+        STR_EVENT_REMOVE   = "remove"
+        STR_EVENT_ADD      = "add"
+        STR_EVENT_ISOLATED = "ISOLATED"
+        
         port_dict = {}
         with NetlinkEventMonitor(timeout) as netlink_monitor:
             for event in netlink_monitor:
                 if event and 'SUBSYSTEM' in event:
-                    if event['SUBSYSTEM'] == 'swps':
-                        #print('SWPS event. From %s, ACTION %s, IF_TYPE %s, IF_LANE %s' % (event['DEVPATH'], event['ACTION'], event['IF_TYPE'], event['IF_LANE']))
+                    if event['SUBSYSTEM'] == STR_SWPS_MOD_NAME:
                         portname = event['DEVPATH'].split("/")[-1]
                         rc = re.match(r"port(?P<num>\d+)",portname)
                         if rc is not None:
-                            if event['ACTION'] == "remove":
+                            if event['ACTION'] == STR_EVENT_REMOVE:
                                 remove_num = int(rc.group("num"))
                                 port_dict[remove_num] = "0"
-                            elif event['ACTION'] == "add":
+                            elif event['ACTION'] == STR_EVENT_ADD:
                                 add_num = int(rc.group("num"))
                                 port_dict[add_num] = "1"
+                                if event['IF_TYPE'] == STR_EVENT_ISOLATED:
+                                    if not TransceiverEvent.handle_update_time_gap(event['DEVNAME']):
+                                        return True, {}
+                            else:
+                                port_dict = {}
                             return True, port_dict
-                        else:
-                            return False, {}
-                    else:
-                        pass
-                else:
-                    return True, {}
+            return True, {}
+
