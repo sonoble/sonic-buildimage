@@ -1,0 +1,30 @@
+From 8fcfd356b0bbfd81329e4b7a0aea5d6196cc4349 Mon Sep 17 00:00:00 2001
+From: James Huang <huang.james@inventec.com>
+Date: Fri, 6 Mar 2020 15:27:00 +0800
+Subject: [PATCH] [xcvrd] Retrieve DOM info using platform API 2.0 if
+ implemented #48
+
+---
+ sonic-xcvrd/scripts/xcvrd | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/sonic-xcvrd/scripts/xcvrd b/sonic-xcvrd/scripts/xcvrd
+index c491375..0347c65 100644
+--- a/sonic-xcvrd/scripts/xcvrd
++++ b/sonic-xcvrd/scripts/xcvrd
+@@ -143,8 +143,10 @@ def _wrapper_get_transceiver_dom_info(physical_port):
+ 
+ def _wrapper_get_transceiver_dom_threshold_info(physical_port):
+     if platform_chassis is not None:
+-        return None
+-
++        try:
++            return platform_chassis.get_sfp(physical_port).get_transceiver_threshold_info()
++        except NotImplementedError:
++            pass
+     return platform_sfputil.get_transceiver_dom_threshold_info_dict(physical_port)
+ 
+ def _wrapper_get_transceiver_change_event(timeout):
+-- 
+2.7.4
+

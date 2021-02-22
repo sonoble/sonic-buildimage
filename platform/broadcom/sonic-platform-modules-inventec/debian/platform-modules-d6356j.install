@@ -1,0 +1,4 @@
+d6356j/utils/inventec_d6356j_util.py            /usr/local/bin
+common/utils/platform/*                         /usr/share/sonic/device/x86_64-inventec_d6356j-r0/plugins
+systemd/platform-modules-d6356j.service         /lib/systemd/system
+d6356j/utils/sonic_platform-1.0-py2-none-any.whl /usr/share/sonic/device/x86_64-inventec_d6356j-r0

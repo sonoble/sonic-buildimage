@@ -1,0 +1,25 @@
+Repository          : onie
+Branch              : tao
+machine_folder      : machine/inventec/sequoia_bde
+
+Commit  : f5ed9a6b5695e7ed8b42d833353ea6a62a5bb9fe
+Date    : 2019-05-31
+
+inv_platform.c
+inv_cpld.c
+inv_psoc.c
+
+======================================================================
+Repository          : swps-driver
+Branch              : master
+
+[swps]
+version : 4.3.2
+Commit  : de743435b452a7a2d34e8161587e2df54cac633a
+Date    : 2019-01-02
+
+=======================================================================
+[kernel driver 4.9.0.8-amd64 ]
+
+gpio-ich            (original)
+lpc_ich             (modified)
