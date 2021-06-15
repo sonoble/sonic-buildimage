@@ -5,10 +5,6 @@
 #
 #  SPDX-License-Identifier:     GPL-2.0
 
-# Function definitions
-# wc -l
-line_count() { return $(echo $1 | wc -l); }
-
 # Appends a command to a trap, which is needed because default trap behavior is to replace
 # previous trap for the same signal
 # - 1st arg:  code to add
@@ -24,12 +20,49 @@ _trap_push() {
 }
 _trap_push true
 
+read_conf_file() {
+    local conf_file=$1
+    while IFS='=' read -r var value || [ -n "$var" ]
+    do
+        # remove newline character
+        var=$(echo $var | tr -d '\r\n')
+        value=$(echo $value | tr -d '\r\n')
+        # remove comment string
+        var=${var%#*}
+        value=${value%#*}
+        # skip blank line
+        [ -z "$var" ] && continue
+        # remove double quote in the beginning
+        tmp_val=${value#\"}
+        # remove double quote in the end
+        value=${tmp_val%\"}
+        eval "$var=\"$value\""
+    done < "$conf_file"
+}
+
 # Main
 set -e
 cd $(dirname $0)
 
-. ./machine.conf
+if [ -d "/etc/sonic" ]; then
+    echo "Installing SONiC in SONiC"
+    install_env="sonic"
+elif grep -Fxqs "DISTRIB_ID=onie" /etc/lsb-release > /dev/null
+then
+    echo "Installing SONiC in ONIE"
+    install_env="onie"
+else
+    echo "Installing SONiC in BUILD"
+    install_env="build"
+fi
+
+if [ -r ./machine.conf ]; then
+    read_conf_file "./machine.conf"
+fi
+
+if [ -r ./onie-image.conf ]; then
 . ./onie-image.conf
+fi
 
 echo "ONIE Installer: platform: $platform"
 
@@ -39,59 +72,95 @@ if [ $(id -u) -ne 0 ]
     exit 1
 fi
 
-# Install demo on same block device as ONIE
-onie_dev=$(blkid | grep ONIE-BOOT | head -n 1 | awk '{print $1}' |  sed -e 's/:.*$//')
-blk_dev=$(echo $onie_dev | sed -e 's/[1-9][0-9]*$//' | sed -e 's/\([0-9]\)\(p\)/\1/')
-# Note: ONIE has no mount setting for / with device node, so below will be empty string
-cur_part=$(cat /proc/mounts | awk "{ if(\$2==\"/\") print \$1 }" | grep $blk_dev || true)
-
-[ -b "$blk_dev" ] || {
-    echo "Error: Unable to determine block device of ONIE install"
+# get running machine from conf file
+if [ -r /etc/machine.conf ]; then
+    read_conf_file "/etc/machine.conf"
+elif [ -r /host/machine.conf ]; then
+    read_conf_file "/host/machine.conf"
+elif [ "$install_env" != "build" ]; then
+    echo "cannot find machine.conf"
     exit 1
-}
+fi
+
+echo "onie_platform: $onie_platform"
+
+# Get platform specific linux kernel command line arguments
+ONIE_PLATFORM_EXTRA_CMDLINE_LINUX=""
+
+# Default var/log device size in MB
+VAR_LOG_SIZE=4096
+
+[ -r platforms/$onie_platform ] && . platforms/$onie_platform
+
+# Pick up console port and speed from install enviroment if not defined yet.
+# Console port and speed setting in cmdline is like "console=ttyS0,9600n",
+# so we can use pattern 'console=ttyS[0-9]+,[0-9]+' to match it.
+# If failed to get the speed and ttyS from cmdline then set them to default: ttyS0 and 9600
+if [ -z "$CONSOLE_PORT" ]; then
+    console_ttys=$(cat /proc/cmdline | grep -Eo 'console=ttyS[0-9]+' | cut -d "=" -f2)
+    if [ -z "$console_ttys" -o "$console_ttys" = "ttyS0" ]; then
+        CONSOLE_PORT=0x3f8
+        CONSOLE_DEV=0
+    elif [ "$console_ttys" = "ttyS1" ]; then
+        CONSOLE_PORT=0x2f8
+        CONSOLE_DEV=1
+    elif [ "$console_ttys" = "ttyS2" ]; then
+        CONSOLE_PORT=0x3e8
+        CONSOLE_DEV=2
+    elif [ "$console_ttys" = "ttyS3" ]; then
+        CONSOLE_PORT=0x2e8
+        CONSOLE_DEV=3
+    fi
+fi
+
+if [ -z "$CONSOLE_SPEED" ]; then
+    speed=$(cat /proc/cmdline | grep -Eo 'console=ttyS[0-9]+,[0-9]+' | cut -d "," -f2)
+    if [ -z "$speed" ]; then
+        CONSOLE_SPEED=9600
+    else
+        CONSOLE_SPEED=$speed
+    fi
+fi
+
+# Install demo on same block device as ONIE
+if [ "$install_env" != "build" ]; then
+    onie_dev=$(blkid | grep ONIE-BOOT | head -n 1 | awk '{print $1}' |  sed -e 's/:.*$//')
+    blk_dev=$(echo $onie_dev | sed -e 's/[1-9][0-9]*$//' | sed -e 's/\([0-9]\)\(p\)/\1/')
+
+    # check if we have an nvme device
+    blk_suffix=
+    echo $blk_dev | grep -q nvme0 && blk_suffix="p"
+
+    # Note: ONIE has no mount setting for / with device node, so below will be empty string
+    cur_part=$(cat /proc/mounts | awk "{ if(\$2==\"/\") print \$1 }" | grep $blk_dev || true)
+
+    [ -b "$blk_dev" ] || {
+        echo "Error: Unable to determine block device of ONIE install"
+        exit 1
+    }
+fi
 
 # If running in ONIE
-if [ "$onie_dev" = "$cur_part" ] || [ -z "$cur_part" ]; then
+if [ "$install_env" = "onie" ]; then
     # The onie bin tool prefix
     onie_bin=
     # The persistent ONIE directory location
     onie_root_dir=/mnt/onie-boot/onie
     # The onie file system root
     onie_initrd_tmp=/
-# Else running in normal Linux
-else
-    # Mount ONIE-BOOT partition
-    onie_mnt=$(mktemp -d) || {
-        echo "Error: Unable to create file system mount point"
-        exit 1
-    }
-    trap_push "fuser -km $onie_mnt || umount $onie_mnt || rmdir $onie_mnt || true"
-    mount $onie_dev $onie_mnt
-    onie_root_dir=$onie_mnt/onie
-    
-    # Mount initrd inside ONIE-BOOT partition
-    onie_initrd_tmp=$(mktemp -d) || {
-        echo "Error: Unable to create file system mount point"
-        exit 1
-    }
-    trap_push "rm -rf $onie_initrd_tmp || true"
-    cd $onie_initrd_tmp
-    # Note: use wildcard in filename below to prevent hard-code version
-    cat $onie_mnt/onie/initrd.img-*-onie | unxz | cpio -id
-    cd -
-    onie_bin="chroot $onie_initrd_tmp"
 fi
 
 # The build system prepares this script by replacing %%DEMO-TYPE%%
 # with "OS" or "DIAG".
 demo_type="%%DEMO_TYPE%%"
 
-# The build system prepares this script by replacing %%GIT_REVISION%%
+# The build system prepares this script by replacing %%IMAGE_VERSION%%
 # with git revision hash as a version identifier
-git_revision="%%GIT_REVISION%%"
+image_version="%%IMAGE_VERSION%%"
+timestamp="$(date -u +%Y%m%d)"
 
-demo_volume_label="ACS-${demo_type}"
-demo_volume_revision_label="ACS-${demo_type}-${git_revision}"
+demo_volume_label="SONiC-${demo_type}"
+demo_volume_revision_label="SONiC-${demo_type}-${image_version}"
 
 # auto-detect whether BIOS or UEFI
 if [ -d "/sys/firmware/efi/efivars" ] ; then
@@ -100,27 +169,31 @@ else
     firmware="bios"
 fi
 
-# determine ONIE partition type
-onie_partition_type=$(${onie_bin} onie-sysinfo -t)
-# demo partition size in MB
-demo_part_size="%%ONIE_IMAGE_PART_SIZE%%"
-if [ "$firmware" = "uefi" ] ; then
-    create_demo_partition="create_demo_uefi_partition"
-elif [ "$onie_partition_type" = "gpt" ] ; then
-    create_demo_partition="create_demo_gpt_partition"
-elif [ "$onie_partition_type" = "msdos" ] ; then
-    create_demo_partition="create_demo_msdos_partition"
-else
-    echo "ERROR: Unsupported partition type: $onie_partition_type"
-    exit 1
+if [ "$install_env" = "onie" ]; then
+    # determine ONIE partition type
+    onie_partition_type=$(${onie_bin} onie-sysinfo -t)
+    # demo partition size in MB
+    demo_part_size="%%ONIE_IMAGE_PART_SIZE%%"
+    if [ "$firmware" = "uefi" ] ; then
+        create_demo_partition="create_demo_uefi_partition"
+    elif [ "$onie_partition_type" = "gpt" ] ; then
+        create_demo_partition="create_demo_gpt_partition"
+    elif [ "$onie_partition_type" = "msdos" ] ; then
+        create_demo_partition="create_demo_msdos_partition"
+    else
+        echo "ERROR: Unsupported partition type: $onie_partition_type"
+        exit 1
+    fi
 fi
 
 # Creates a new partition for the DEMO OS.
-# 
+#
 # arg $1 -- base block device
 #
 # Returns the created partition number in $demo_part
 demo_part=""
+# TODO: remove reference to "ACS-OS" after all baseimages are upgraded
+legacy_volume_label="ACS-OS"
 create_demo_gpt_partition()
 {
     blk_dev="$1"
@@ -129,9 +202,9 @@ create_demo_gpt_partition()
     tmpfifo=$(mktemp -u)
     trap_push "rm $tmpfifo || true"
     mkfifo -m 600 "$tmpfifo"
-    
+
     # See if demo partition already exists
-    demo_part=$(sgdisk -p $blk_dev | grep "$demo_volume_label" | awk '{print $1}')
+    demo_part=$(sgdisk -p $blk_dev | grep -e "$demo_volume_label" -e "$legacy_volume_label" | awk '{print $1}')
     if [ -n "$demo_part" ] ; then
         # delete existing partitions
         # if there are multiple partitions matched, we should delete each one, except the current OS's
@@ -140,11 +213,21 @@ create_demo_gpt_partition()
         while read -r part_index; do
             if [ "$blk_dev$part_index" = "$cur_part" ]; then continue; fi
             echo "deleting partition $part_index ..."
+            # if the partition is already mounted, umount first
+            df $blk_dev$part_index 2>/dev/null && {
+                umount $blk_dev$part_index || {
+                    echo "Error: Unable to umount $blk_dev$part_index"
+                    exit 1
+                }
+            }
             sgdisk -d $part_index $blk_dev || {
                 echo "Error: Unable to delete partition $part_index on $blk_dev"
                 exit 1
             }
-            partprobe
+            partprobe || {
+                echo "Error: Unable to partprobe"
+                exit 1
+            }
         done < $tmpfifo
     fi
 
@@ -167,7 +250,7 @@ create_demo_gpt_partition()
     echo "Partition #$demo_part is available"
 
     # Create new partition
-    echo "Creating new $demo_volume_label partition ${blk_dev}$demo_part ..."
+    echo "Creating new $demo_volume_label partition ${blk_dev}${blk_suffix}$demo_part ..."
 
     if [ "$demo_type" = "DIAG" ] ; then
         # set the GPT 'system partition' attribute bit for the DIAG
@@ -178,13 +261,14 @@ create_demo_gpt_partition()
     fi
     sgdisk --new=${demo_part}::+${demo_part_size}MB \
         --attributes=${demo_part}:=:$attr_bitmask \
-        --change-name=${demo_part}:$demo_volume_revision_label $blk_dev \
+        --change-name=${demo_part}:$demo_volume_label $blk_dev \
     || {
+        echo "Warning: The first trial of creating partition failed, trying the largest aligned available block of sectors on the disk"
         begin=$(sgdisk -F $blk_dev)
         end=$(sgdisk -E $blk_dev)
         sgdisk --new=${demo_part}:$begin:$end \
             --attributes=${demo_part}:=:$attr_bitmask \
-            --change-name=${demo_part}:$demo_volume_revision_label $blk_dev
+            --change-name=${demo_part}:$demo_volume_label $blk_dev
     } || {
         echo "Error: Unable to create partition $demo_part on $blk_dev"
         exit 1
@@ -202,7 +286,7 @@ create_demo_msdos_partition()
 
     # See if demo partition already exists -- look for the filesystem
     # label.
-    part_info="$(blkid | grep $demo_volume_label | awk -F: '{print $1}')"
+    part_info="$(blkid | grep -e "$demo_volume_label" -e "$legacy_volume_label" | awk -F: '{print $1}')"
     if [ -n "$part_info" ] ; then
         # delete existing partition
         demo_part="$(echo -n $part_info | sed -e s#${blk_dev}##)"
@@ -245,7 +329,7 @@ create_demo_uefi_partition()
     create_demo_gpt_partition "$1"
 
     # erase any related EFI BootOrder variables from NVRAM.
-    for b in $(efibootmgr | grep "$demo_volume_label" | awk '{ print $1 }') ; do
+    for b in $(efibootmgr | grep -e "$demo_volume_label" -e "$legacy_volume_label" | awk '{ print $1 }') ; do
         local num=${b#Boot}
         # Remove trailing '*'
         num=${num%\*}
@@ -297,6 +381,7 @@ demo_install_grub()
             cat $grub_install_log && rm -f $grub_install_log
             exit 1
         }
+
         rm -f $grub_install_log
 
         # restore immutable flag on the core.img file as discussed
@@ -336,7 +421,7 @@ demo_install_uefi_grub()
     grub_install_log=$(mktemp)
     grub-install \
         --no-nvram \
-        --bootloader-id="$onie_initrd_tmp/$demo_volume_label" \
+        --bootloader-id="$demo_volume_label" \
         --efi-directory="/boot/efi" \
         --boot-directory="$demo_mnt" \
         --recheck \
@@ -359,35 +444,103 @@ demo_install_uefi_grub()
 
 }
 
-eval $create_demo_partition $blk_dev
-demo_dev=$(echo $blk_dev | sed -e 's/\(mmcblk[0-9]\)/\1p/')$demo_part
+image_dir="image-$image_version"
 
-# Make filesystem
-mkfs.ext4 -L $demo_volume_revision_label $demo_dev
+if [ "$install_env" = "onie" ]; then
+    eval $create_demo_partition $blk_dev
+    demo_dev=$(echo $blk_dev | sed -e 's/\(mmcblk[0-9]\)/\1p/')$demo_part
+    echo $blk_dev | grep -q nvme0 && demo_dev=$(echo $blk_dev | sed -e 's/\(nvme[0-9]n[0-9]\)/\1p/')$demo_part
 
-# Mount demo filesystem
-demo_mnt=$(${onie_bin} mktemp -d) || {
-    echo "Error: Unable to create file system mount point"
-    exit 1
-}
-trap_push "${onie_bin} fuser -km $demo_mnt || ${onie_bin} umount $demo_mnt || ${onie_bin} rmdir $demo_mnt || true"
-${onie_bin} mount -t ext4 -o defaults,rw $demo_dev $demo_mnt || {
-    echo "Error: Unable to mount $demo_dev on $demo_mnt"
-    exit 1
-}
+    # Make filesystem
+    mkfs.ext4 -L $demo_volume_label $demo_dev
+
+    # Mount demo filesystem
+    demo_mnt=$(${onie_bin} mktemp -d) || {
+        echo "Error: Unable to create file system mount point"
+        exit 1
+    }
+    trap_push "${onie_bin} fuser -km $demo_mnt || ${onie_bin} umount $demo_mnt || ${onie_bin} rmdir $demo_mnt || true"
+    ${onie_bin} mount -t ext4 -o defaults,rw $demo_dev $demo_mnt || {
+        echo "Error: Unable to mount $demo_dev on $demo_mnt"
+        exit 1
+    }
+
+elif [ "$install_env" = "sonic" ]; then
+    demo_mnt="/host"
+    eval running_sonic_revision=$(cat /etc/sonic/sonic_version.yml | grep build_version | cut -f2 -d" ")
+    # Prevent installing existing SONiC if it is running
+    if [ "$image_dir" = "image-$running_sonic_revision" ]; then
+        echo "Not installing SONiC version $running_sonic_revision, as current running SONiC has the same version"
+        exit 0
+    fi
+    # Remove extra SONiC images if any
+    for f in $demo_mnt/image-* ; do
+        if [ -d $f ] && [ "$f" != "$demo_mnt/image-$running_sonic_revision" ] && [ "$f" != "$demo_mnt/$image_dir" ]; then
+            echo "Removing old SONiC installation $f"
+            rm -rf $f
+        fi
+    done
+else
+    demo_mnt="build_raw_image_mnt"
+    demo_dev=$cur_wd/"%%OUTPUT_RAW_IMAGE%%"
+
+    mkfs.ext4 -L $demo_volume_label $demo_dev
+
+    echo "Mounting $demo_dev on $demo_mnt..."
+    mkdir $demo_mnt
+    mount -t auto -o loop $demo_dev $demo_mnt
+fi
+
+echo "Installing SONiC to $demo_mnt/$image_dir"
+
+# Create target directory or clean it up if exists
+if [ -d $demo_mnt/$image_dir ]; then
+    echo "Directory $demo_mnt/$image_dir/ already exists. Cleaning up..."
+    rm -rf $demo_mnt/$image_dir/*
+else
+    mkdir $demo_mnt/$image_dir || {
+        echo "Error: Unable to create SONiC directory"
+        exit 1
+    }
+fi
 
 # Decompress the file for the file system directly to the partition
-unzip $ONIE_INSTALLER_PAYLOAD -d $demo_mnt
-
-# store installation log in demo file system
-rm -f $onie_initrd_tmp/tmp/onie-support.tar.bz2
-${onie_bin} onie-support /tmp
-mv $onie_initrd_tmp/tmp/onie-support.tar.bz2 $demo_mnt
-
-if [ "$firmware" = "uefi" ] ; then
-    demo_install_uefi_grub "$demo_mnt" "$blk_dev"
+if [ x"$docker_inram" = x"on" ]; then
+    # when disk is small, keep dockerfs.tar.gz in disk, expand it into ramfs during initrd
+    unzip -o $ONIE_INSTALLER_PAYLOAD -d $demo_mnt/$image_dir
 else
-    demo_install_grub "$demo_mnt" "$blk_dev"
+    unzip -o $ONIE_INSTALLER_PAYLOAD -x "$FILESYSTEM_DOCKERFS" -d $demo_mnt/$image_dir
+
+    if [ "$install_env" = "onie" ]; then
+        TAR_EXTRA_OPTION="--numeric-owner"
+    else
+        TAR_EXTRA_OPTION="--numeric-owner --warning=no-timestamp"
+    fi
+    mkdir -p $demo_mnt/$image_dir/$DOCKERFS_DIR
+    unzip -op $ONIE_INSTALLER_PAYLOAD "$FILESYSTEM_DOCKERFS" | tar xz $TAR_EXTRA_OPTION -f - -C $demo_mnt/$image_dir/$DOCKERFS_DIR
+fi
+
+if [ "$install_env" = "onie" ]; then
+    # Store machine description in target file system
+    if [ -f /etc/machine-build.conf ]; then
+        # onie_ variable are generate at runtime.
+        # they are no longer hardcoded in /etc/machine.conf
+        # also remove single quotes around the value
+        set | grep ^onie | sed -e "s/='/=/" -e "s/'$//" > $demo_mnt/machine.conf
+    else
+        cp /etc/machine.conf $demo_mnt
+    fi
+
+    # Store installation log in target file system
+    rm -f $onie_initrd_tmp/tmp/onie-support*.tar.bz2
+    ${onie_bin} onie-support /tmp
+    mv $onie_initrd_tmp/tmp/onie-support*.tar.bz2 $demo_mnt/$image_dir/
+
+    if [ "$firmware" = "uefi" ] ; then
+        demo_install_uefi_grub "$demo_mnt" "$blk_dev"
+    else
+        demo_install_grub "$demo_mnt" "$blk_dev"
+    fi
 fi
 
 # Create a minimal grub.cfg that allows for:
@@ -408,8 +561,17 @@ trap_push "rm $grub_cfg || true"
 
 [ -r ./platform.conf ] && . ./platform.conf
 
-DEFAULT_GRUB_SERIAL_COMMAND="serial --port=%%CONSOLE_PORT%% --speed=%%CONSOLE_SPEED%% --word=8 --parity=no --stop=1"
-DEFAULT_GRUB_CMDLINE_LINUX="console=tty0 console=ttyS%%CONSOLE_DEV%%,%%CONSOLE_SPEED%%n8 quiet"
+# Check if the CPU vendor is 'Intel' and disable c-states if True
+CPUVENDOR=$(cat /proc/cpuinfo | grep -m 1 vendor_id | awk '{print $3}')
+echo "Switch CPU vendor is: $CPUVENDOR"
+if [[ $(echo $CPUVENDOR | grep -i "Intel") ]] ; then
+    CSTATES="intel_idle.max_cstate=0"
+else
+    CSTATES=""
+fi
+
+DEFAULT_GRUB_SERIAL_COMMAND="serial --port=${CONSOLE_PORT} --speed=${CONSOLE_SPEED} --word=8 --parity=no --stop=1"
+DEFAULT_GRUB_CMDLINE_LINUX="console=tty0 console=ttyS${CONSOLE_DEV},${CONSOLE_SPEED}n8 quiet $CSTATES"
 GRUB_SERIAL_COMMAND=${GRUB_SERIAL_COMMAND:-"$DEFAULT_GRUB_SERIAL_COMMAND"}
 GRUB_CMDLINE_LINUX=${GRUB_CMDLINE_LINUX:-"$DEFAULT_GRUB_CMDLINE_LINUX"}
 export GRUB_SERIAL_COMMAND
@@ -418,22 +580,31 @@ export GRUB_CMDLINE_LINUX
 # Add common configuration, like the timeout and serial console.
 cat <<EOF > $grub_cfg
 $GRUB_SERIAL_COMMAND
-terminal_input serial
-terminal_output serial
+terminal_input console serial
+terminal_output console serial
 
 set timeout=5
 
 EOF
 
-# Add the logic to support grub-reboot
+# Add the logic to support grub-reboot and grub-set-default
 cat <<EOF >> $grub_cfg
 if [ -s \$prefix/grubenv ]; then
-  load_env
+    load_env
 fi
-if [ "\${next_entry}" ] ; then
-   set default="\${next_entry}"
-   set next_entry=
-   save_env next_entry
+if [ "\${saved_entry}" ]; then
+    set default="\${saved_entry}"
+fi
+if [ "\${next_entry}" ]; then
+    set default="\${next_entry}"
+    unset next_entry
+    save_env next_entry
+fi
+if [ "\${onie_entry}" ]; then
+    set next_entry="\${default}"
+    set default="\${onie_entry}"
+    unset onie_entry
+    save_env onie_entry next_entry
 fi
 
 EOF
@@ -447,30 +618,60 @@ EOF
     $onie_root_dir/tools/bin/onie-boot-mode -q -o install
 fi
 
-# Add a menu entry for the DEMO OS
+# Add a menu entry for the SONiC OS
 # Note: assume that apparmor is supported in the kernel
 demo_grub_entry="$demo_volume_revision_label"
+if [ "$install_env" = "sonic" ]; then
+    old_sonic_menuentry=$(cat /host/grub/grub.cfg | sed "/$running_sonic_revision/,/}/!d")
+    grub_cfg_root=$(echo $old_sonic_menuentry | sed -e "s/.*root\=\(.*\)rw.*/\1/")
+    onie_menuentry=$(cat /host/grub/grub.cfg | sed "/menuentry ONIE/,/}/!d")
+elif [ "$install_env" = "build" ]; then
+    grub_cfg_root=%%SONIC_ROOT%%
+else # install_env = "onie"
+    uuid=$(blkid "$demo_dev" | sed -ne 's/.* UUID=\"\([^"]*\)\".*/\1/p')
+    if [ -z "$uuid" ]; then
+        grub_cfg_root=$demo_dev
+    else
+        grub_cfg_root=UUID=$uuid
+    fi
+fi
+
 cat <<EOF >> $grub_cfg
 menuentry '$demo_grub_entry' {
-        search --no-floppy --label --set=root $demo_volume_revision_label
-        echo    'Loading $demo_volume_revision_label $demo_type kernel ...'
+        search --no-floppy --label --set=root $demo_volume_label
+        echo    'Loading $demo_volume_label $demo_type kernel ...'
         insmod gzio
         if [ x$grub_platform = xxen ]; then insmod xzio; insmod lzopio; fi
         insmod part_msdos
         insmod ext2
-        linux   /boot/vmlinuz-3.16.0-4-amd64 root=$demo_dev rw $GRUB_CMDLINE_LINUX  \
-                loop=$FILESYSTEM_SQUASHFS loopfstype=squashfs                       \
-                apparmor=1 security=apparmor
-        echo    'Loading $demo_volume_revision_label $demo_type initial ramdisk ...'
-        initrd  /boot/initrd.img-3.16.0-4-amd64
+        linux   /$image_dir/boot/vmlinuz-4.19.0-12-2-amd64 root=$grub_cfg_root rw $GRUB_CMDLINE_LINUX  \
+                net.ifnames=0 biosdevname=0 \
+                loop=$image_dir/$FILESYSTEM_SQUASHFS loopfstype=squashfs                       \
+                apparmor=1 security=apparmor varlog_size=$VAR_LOG_SIZE usbcore.autosuspend=-1 $ONIE_PLATFORM_EXTRA_CMDLINE_LINUX
+        echo    'Loading $demo_volume_label $demo_type initial ramdisk ...'
+        initrd  /$image_dir/boot/initrd.img-4.19.0-12-2-amd64
 }
 EOF
 
-# Add menu entries for ONIE -- use the grub fragment provided by the
-# ONIE distribution.
-$onie_root_dir/grub.d/50_onie_grub >> $grub_cfg
+if [ "$install_env" = "onie" ]; then
+    # Add menu entries for ONIE -- use the grub fragment provided by the
+    # ONIE distribution.
+    $onie_root_dir/grub.d/50_onie_grub >> $grub_cfg
+    mkdir -p $onie_initrd_tmp/$demo_mnt/grub
+else
+cat <<EOF >> $grub_cfg
+$old_sonic_menuentry
+$onie_menuentry
+EOF
+fi
 
-mkdir -p $onie_initrd_tmp/$demo_mnt/grub
-cp $grub_cfg $onie_initrd_tmp/$demo_mnt/grub/grub.cfg
+if [ "$install_env" = "build" ]; then
+    cp $grub_cfg $demo_mnt/grub.cfg
+    umount $demo_mnt
+else
+    cp $grub_cfg $onie_initrd_tmp/$demo_mnt/grub/grub.cfg
+fi
 
 cd /
+
+echo "Installed SONiC base image $demo_volume_label successfully"

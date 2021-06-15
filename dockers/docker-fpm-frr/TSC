@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# Load the common functions
+source /usr/bin/TS
+
+check_not_installed
+not_installed=$?
+
+check_installed
+installed=$?
+
+if [[ $installed -eq 0 ]];
+then
+  echo "System Mode: Normal"
+elif [[ $not_installed -eq 0 ]];
+then
+  echo "System Mode: Maintenance"
+else
+  echo "System Mode: Not consistent"
+fi

@@ -1,0 +1,5 @@
+#!/bin/bash
+
+/usr/bin/TS TSC
+
+portstat -p 5
